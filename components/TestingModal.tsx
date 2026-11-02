@@ -16,9 +16,7 @@ declare global {
   }
 }
 
-const siteKey = process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY ?? "";
-
-export default function TestingModal() {
+export default function TestingModal({ siteKey }: { siteKey: string }) {
   const formRef = useRef<HTMLFormElement>(null);
   const widgetRef = useRef<HTMLDivElement>(null);
   const widgetId = useRef<number | null>(null);
@@ -66,7 +64,7 @@ export default function TestingModal() {
     };
     modal?.addEventListener("shown.bs.modal", onShown);
     return () => modal?.removeEventListener("shown.bs.modal", onShown);
-  }, []);
+  }, [siteKey]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

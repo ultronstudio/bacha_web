@@ -5,6 +5,11 @@ import Image from "next/image";
 import SectionJump from "@/components/SectionJump";
 
 export default function HomePage() {
+  const recaptchaSiteKey =
+    process.env.NEXT_PUBLIC_RECAPTCHA_SITE_KEY ||
+    process.env.RECAPTCHA_SITE_KEY ||
+    "";
+
   return (
     <>
       <section className="hero">
@@ -186,7 +191,7 @@ export default function HomePage() {
           </button>
         </div>
       </section>
-      <TestingModal />
+      <TestingModal siteKey={recaptchaSiteKey} />
     </>
   );
 }
