@@ -46,58 +46,38 @@ export function renderOpenGraphImage(logo: string) {
         height: "100%",
         display: "flex",
         alignItems: "center",
+        justifyContent: "center",
         padding: "72px 96px",
         backgroundColor: "#FAFAF7",
         color: "#1E1C16",
-        fontFamily: "Arial, sans-serif",
+        fontFamily: "Nunito, Arial, sans-serif",
       }}
     >
       <div
         style={{
-          width: 220,
-          height: 240,
+          width: 200,
+          height: 220,
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
           flexShrink: 0,
         }}
       >
-        <Logo src={logo} width={166} height={178} />
+        <Logo src={logo} width={180} height={193} />
       </div>
       <div
         style={{
           display: "flex",
           flexDirection: "column",
-          marginLeft: 64,
+          marginLeft: 72,
+          fontSize: 76,
+          fontWeight: 800,
+          lineHeight: 1.05,
+          letterSpacing: -2,
         }}
       >
-        <div style={{ color: "#855200", fontSize: 30, fontWeight: 800 }}>
-          Bacha!
-        </div>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            marginTop: 18,
-            fontSize: 72,
-            fontWeight: 800,
-            lineHeight: 1.04,
-            letterSpacing: -2,
-          }}
-        >
-          <div>Než klikneš,</div>
-          <div>zkontroluj.</div>
-        </div>
-        <div
-          style={{
-            marginTop: 24,
-            color: "#6B675E",
-            fontSize: 25,
-            lineHeight: 1.35,
-          }}
-        >
-          Osobní asistent proti podvodům
-        </div>
+        <div>Než klikneš,</div>
+        <div>zkontroluj.</div>
       </div>
     </div>,
     { width: 1200, height: 630 },
