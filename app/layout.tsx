@@ -16,18 +16,24 @@ export const metadata: Metadata = {
     locale: "cs_CZ",
     siteName: "Bacha!",
     url: "/",
-    title: "Bacha! – Než klikneš, zkontroluj.",
+    title: "Bacha! – Než klikneš, zkontroluj",
     description:
       "Bacha! – osobní asistent proti podvodům. Prověřte zprávy, odkazy, QR kódy a screenshoty.",
+    images: [{
+      url: "/og-image?theme=light",
+      width: 1200,
+      height: 630,
+      alt: "Bacha! – Než klikneš, zkontroluj",
+    }],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Bacha! – Než klikneš, zkontroluj.",
+    title: "Bacha! – Než klikneš, zkontroluj",
     description:
       "Bacha! – osobní asistent proti podvodům. Prověřte zprávy, odkazy, QR kódy a screenshoty.",
-    images: ["/opengraph-image"],
+    images: ["/og-image?theme=light"],
   },
-  title: "Bacha! – Než klikneš, zkontroluj.",
+  title: "Bacha! – Než klikneš, zkontroluj",
   description:
     "Bacha! – osobní asistent proti podvodům. Prověřte zprávy, odkazy, QR kódy a screenshoty.",
   metadataBase: new URL(process.env.APP_ORIGIN || "https://bacha.petrvurm.cz"),

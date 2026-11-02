@@ -20,6 +20,23 @@ export async function loadBachaLogo() {
   return `data:image/svg+xml;base64,${svg.toString("base64")}`;
 }
 
+async function loadNunitoFont(weight: 600 | 800) {
+  const paths = [
+    `nunito-latin-${weight}-normal.woff`,
+    `nunito-latin-ext-${weight}-normal.woff`,
+  ];
+
+  return Promise.all(
+    paths.map(async (path) => {
+      const font = await readFile(join(process.cwd(), "public", "assets", "fonts", path));
+      return font.buffer.slice(
+        font.byteOffset,
+        font.byteOffset + font.byteLength,
+      ) as ArrayBuffer;
+    }),
+  );
+}
+
 export function renderAppleIcon(logo: string) {
   return new ImageResponse(
     <div
@@ -38,7 +55,17 @@ export function renderAppleIcon(logo: string) {
   );
 }
 
-export function renderOpenGraphImage(logo: string) {
+export async function renderOpenGraphImage(
+  logo: string,
+  theme: "light" | "dark" = "light",
+) {
+  const [nunito600, nunito600Ext] = await loadNunitoFont(600);
+  const [nunito800, nunito800Ext] = await loadNunitoFont(800);
+  const colors =
+    theme === "dark"
+      ? { background: "#131311", title: "#FAFAF7", slogan: "#C3C0B7" }
+      : { background: "#FAFAF7", title: "#1E1C16", slogan: "#6B675E" };
+
   return new ImageResponse(
     <div
       style={{
@@ -48,9 +75,9 @@ export function renderOpenGraphImage(logo: string) {
         alignItems: "center",
         justifyContent: "center",
         padding: "72px 96px",
-        backgroundColor: "#FAFAF7",
-        color: "#1E1C16",
-        fontFamily: "Nunito, Arial, sans-serif",
+        backgroundColor: colors.background,
+        color: colors.title,
+        fontFamily: "Nunito, Nunito Ext",
       }}
     >
       <div
@@ -69,17 +96,41 @@ export function renderOpenGraphImage(logo: string) {
         style={{
           display: "flex",
           flexDirection: "column",
-          marginLeft: 72,
-          fontSize: 76,
-          fontWeight: 800,
-          lineHeight: 1.05,
-          letterSpacing: -2,
+          marginLeft: 64,
+          gap: 14,
         }}
       >
-        <div>Než klikneš,</div>
-        <div>zkontroluj.</div>
+        <div
+          style={{
+            fontSize: 94,
+            fontWeight: 800,
+            lineHeight: 1,
+            letterSpacing: -3,
+          }}
+        >
+          Bacha!
+        </div>
+        <div
+          style={{
+            color: colors.slogan,
+            fontSize: 42,
+            fontWeight: 600,
+            lineHeight: 1.15,
+          }}
+        >
+          Než klikneš, zkontroluj
+        </div>
       </div>
     </div>,
-    { width: 1200, height: 630 },
+    {
+      width: 1200,
+      height: 630,
+      fonts: [
+        { name: "Nunito", data: nunito600, weight: 600, style: "normal" },
+        { name: "Nunito Ext", data: nunito600Ext, weight: 600, style: "normal" },
+        { name: "Nunito", data: nunito800, weight: 800, style: "normal" },
+        { name: "Nunito Ext", data: nunito800Ext, weight: 800, style: "normal" },
+      ],
+    },
   );
 }
