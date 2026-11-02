@@ -1,2 +1,7 @@
 .env
 !.env.example
+node_modules/
+.next/
+out/
+*.tsbuildinfo
+next-env.d.ts
