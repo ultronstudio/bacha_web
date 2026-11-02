@@ -1,0 +1,74 @@
+rules_version = '2';
+
+// Bacha! Firestore security rules.
+// Clients may access only their own non-authoritative profile data and allowed
+// read projections. Security-relevant writes go through the authenticated API
+// using Firebase Admin, which bypasses these rules.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    function validProfile(data) {
+      return data.keys().hasOnly(['lastSeenAt', 'accountKind', 'displayName', 'email', 'notificationPreferences'])
+        && (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 200))
+        && (!('email' in data) || (data.email is string && data.email.size() <= 320))
+        && (!('accountKind' in data) || data.accountKind in ['anonymous', 'google'])
+        && (!('notificationPreferences' in data) || data.notificationPreferences is map);
+    }
+
+    match /users/{userId} {
+      allow read: if isOwner(userId);
+      allow create, update: if isOwner(userId) && validProfile(request.resource.data);
+      // Account deletion goes through DELETE /api/v1/account.
+      allow delete: if false;
+
+      match /devices/{deviceId} {
+        // FCM registration and updates go through the authenticated Bacha API.
+        allow read: if isOwner(userId);
+        allow write: if false;
+      }
+
+      // Server-authoritative entitlement & usage: read-only for the owner.
+      match /entitlement/{entitlementId} {
+        allow read: if isOwner(userId);
+        allow write: if false;
+      }
+      match /usage/{period} {
+        allow read: if isOwner(userId);
+        allow write: if false;
+      }
+    }
+
+    // Threat intelligence is reachable through the authenticated API only
+    // (Auth + App Check + transactional rate limits); no direct enumeration.
+    match /threatIndicators/{lookupKey} {
+      allow read, write: if false;
+      match /evidence/{evidenceId} {
+        allow read, write: if false;
+      }
+    }
+
+    // Users may read their own watches (documents carry `uid`); writes use the API.
+    match /threatWatches/{watchId} {
+      allow read: if isAuthenticated() && resource.data.uid == request.auth.uid;
+      allow write: if false;
+    }
+
+    match /indicatorHistory/{eventId} { allow read, write: if false; }
+    match /userReports/{reportId} { allow read, write: if false; }
+    match /threatDisputes/{disputeId} { allow read, write: if false; }
+    match /purchases/{tokenHash} { allow read, write: if false; }
+    match /rateLimits/{limitId} { allow read, write: if false; }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
