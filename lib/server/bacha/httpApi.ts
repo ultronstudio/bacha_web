@@ -5,11 +5,12 @@ import { GoogleGenAI } from "@google/genai";
 import { google } from "googleapis";
 import type { Firestore } from "firebase-admin/firestore";
 import { deleteAllUserData } from "./accountDeletion.js";
+import { deleteAccountAfterRateLimit } from "./accountDeletionRoute.js";
 import { analyzeContent } from "./analysisService.js";
 import * as billing from "./billing.js";
 import { requireSecret, optionalSecret } from "./config.js";
 import { firestore as getFirestore, firebaseAuth } from "./firebaseAdmin";
-import { enforceRateLimit, RateLimitError } from "./rateLimit.js";
+import { enforceRateLimit } from "./rateLimit.js";
 import * as threatIntel from "./threatIntel.js";
 import { fs } from "./fsHelpers.js";
 import { validateDeviceId, validateDevicePayload } from "./deviceValidation.js";
@@ -109,10 +110,10 @@ async function routeOperation(request: Request, segments: string[]) {
     return jsonResponse(200, { ok: true, ...(await billing.verifyAndGrant({ db: firestore, playClient: playClient() }, uid, await readJson(request))) });
   }
   if (path === "account" && method === "DELETE") {
-    await enforceRateLimit(firestore, uid, "deleteUserData").catch((error) => {
-      if (error instanceof RateLimitError) throw error;
+    const result = await deleteAccountAfterRateLimit({
+      enforceRateLimit: () => enforceRateLimit(firestore, uid, "deleteUserData"),
+      deleteUserData: () => deleteAllUserData({ db: firestore, auth: firebaseAuth() }, uid),
     });
-    const result = await deleteAllUserData({ db: firestore, auth: firebaseAuth() }, uid);
     return jsonResponse(200, { ok: true, success: true, authDeleted: result.authDeleted });
   }
   if (path === "admin/threats/moderate" && method === "POST") {
@@ -120,8 +121,8 @@ async function routeOperation(request: Request, segments: string[]) {
     const data = await readJson(request);
     const lookupKey = limits.validateLookupKey(data.lookupKey);
     const allowed = [threatIntel.VERDICTS.CONFIRMED_MALICIOUS, threatIntel.VERDICTS.SUSPICIOUS, threatIntel.VERDICTS.KNOWN_SAFE, threatIntel.VERDICTS.INACTIVE];
-    if (!allowed.includes(data.verdict as string)) throw new limits.ValidationError("NeplatnĂ˝ verdikt.");
-    if (typeof data.reason !== "string" || data.reason.trim().length < 5) throw new limits.ValidationError("ChybĂ­ zdĹŻvodnÄ›nĂ­.");
+    if (!allowed.includes(data.verdict as string)) throw new limits.ValidationError("Neplatný verdikt.");
+    if (typeof data.reason !== "string" || data.reason.trim().length < 5) throw new limits.ValidationError("Chybí zdůvodnění.");
     const result = await threatIntel.applyTrustedVerdict(firestore, {
       lookupKey, verdict: data.verdict, category: limits.REPORT_CATEGORIES.includes(data.category) ? data.category : null,
       sourceType: threatIntel.SOURCE_TYPES.MANUAL_REVIEW, actorUid: uid, reason: data.reason.slice(0, 500),
@@ -131,7 +132,7 @@ async function routeOperation(request: Request, segments: string[]) {
   if (path === "admin/disputes/resolve" && method === "POST") {
     requireAdmin(identity);
     const data = await readJson(request);
-    if (typeof data.disputeId !== "string" || data.disputeId.length > 200) throw new limits.ValidationError("NeplatnĂ© ID.");
+    if (typeof data.disputeId !== "string" || data.disputeId.length > 200) throw new limits.ValidationError("Neplatné ID.");
     const result = await threatIntel.resolveDispute(firestore, {
       disputeId: data.disputeId, resolution: data.resolution, newVerdict: data.newVerdict, actorUid: uid, note: data.note,
     });
@@ -153,7 +154,7 @@ async function handleDevice(request: Request, firestore: Firestore, uid: string,
     await ref.delete();
     return jsonResponse(200, { ok: true, success: true });
   }
-  if (method !== "PUT" && method !== "PATCH") throw new ApiError(405, "method-not-allowed", "Metoda nenĂ­ podporovĂˇna.");
+  if (method !== "PUT" && method !== "PATCH") throw new ApiError(405, "method-not-allowed", "Metoda není podporována.");
   const data = validateDevicePayload(await readJson(request), method);
   const existing = method === "PATCH" ? await ref.get() : null;
   const permissionGranted = typeof data.permissionGranted === "boolean"
@@ -181,35 +182,39 @@ export async function handleV1(request: Request, segments: string[]) {
 
 export async function handleRtdn(request: Request) {
   try {
-    const firestore = getFirestore();
     const authorization = request.headers.get("authorization") || "";
     const match = /^Bearer\s+(.+)$/i.exec(authorization);
+    if (!match) throw new ApiError(401, "unauthenticated", "Chybí OIDC token Pub/Sub.");
     const expectedEmail = requireSecret("PUBSUB_PUSH_SERVICE_ACCOUNT_EMAIL").toLowerCase();
     const expectedAudience = requireSecret("PUBSUB_PUSH_AUDIENCE");
-    await verifyPubSubOidc(match?.[1], expectedEmail, expectedAudience, async (token: string, audience: string) => {
+    await verifyPubSubOidc(match[1], expectedEmail, expectedAudience, async (token: string, audience: string) => {
       const ticket = await new OAuth2Client().verifyIdToken({ idToken: token, audience });
       return ticket.getPayload();
     });
 
+    const firestore = getFirestore();
     const payload = decodePubSubRtdn(await readJson(request));
     const result = await billing.handleRtdn({ db: firestore, playClient: playClient() }, payload);
     return jsonResponse(200, { ok: true, ...result });
   } catch (error) {
-    return errorResponse(error, "RTDN se nepodaĹ™ilo zpracovat.");
+    return errorResponse(error, "RTDN se nepodařilo zpracovat.");
   }
 }
 
 export async function handleCron(request: Request) {
   try {
-    const firestore = getFirestore();
+    const authorization = request.headers.get("authorization") || "";
+    const match = /^Bearer\s+(.+)$/i.exec(authorization);
+    if (!match) throw new ApiError(401, "unauthenticated", "Chybí autorizace cron úlohy.");
     const cronSecret = requireSecret("CRON_SECRET");
     if (cronSecret.length < 32) throw new Error("CRON_SECRET must be at least 32 characters.");
-    if (request.headers.get("authorization") !== `Bearer ${cronSecret}`) {
-      throw new ApiError(401, "unauthenticated", "NeplatnĂˇ autorizace cron Ăşlohy.");
+    if (match[1] !== cronSecret) {
+      throw new ApiError(401, "unauthenticated", "Neplatná autorizace cron úlohy.");
     }
+    const firestore = getFirestore();
     const result = await threatIntel.revalidateExpiredIndicators(firestore);
     return jsonResponse(200, { ok: true, ...result });
   } catch (error) {
-    return errorResponse(error, "Revalidaci hrozeb se nepodaĹ™ilo dokonÄŤit.");
+    return errorResponse(error, "Revalidaci hrozeb se nepodařilo dokončit.");
   }
 }
