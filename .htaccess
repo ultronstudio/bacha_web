@@ -1,0 +1,18 @@
+Options -Indexes -MultiViews
+DirectoryIndex index.php
+
+RewriteEngine On
+
+# Renderovací soubory jsou interní a nejdou otevřít přímo.
+RewriteRule ^pages(?:/|$) - [F,L]
+
+# Skryté soubory neposkytovat.
+RewriteRule "(^|/)\." - [F,L]
+
+# Existující soubory jako api.php, favicon nebo robots.txt obslouží Apache přímo.
+RewriteCond %{REQUEST_FILENAME} -f [OR]
+RewriteCond %{REQUEST_FILENAME} -d
+RewriteRule ^ - [L]
+
+# Všechny stránky obsluhuje jediný layout/router index.php.
+RewriteRule ^ index.php [QSA,L]

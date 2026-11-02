@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg">
+  <symbol id="icon" viewBox="0 0 16 16">
+<path fill="currentColor" d="M1.5 1.5v4h1v-3h3v-1h-4Zm9 0v1h3v3h1v-4h-4Zm3 9v3h-3v1h4v-4h-1Zm-11 0h-1v4h4v-1h-3v-3Z"/>
+    <path fill="currentColor" d="M4 4h3v3H4V4Zm1 1v1h1V5H5Zm4-1h3v3H9V4Zm1 1v1h1V5h-1ZM4 9h3v3H4V9Zm1 1v1h1v-1H5Zm4-1h1v1H9V9Zm2 0h1v1h-1V9Zm-2 2h1v1H9v-1Zm1-1h1v1h-1v-1Zm1 1h1v1h-1v-1Z"/>
+  </symbol>
+</svg>
