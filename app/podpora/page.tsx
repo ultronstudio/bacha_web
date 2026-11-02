@@ -32,8 +32,7 @@ export default function SupportPage() {
             pomoct s aplikací Bacha!? Napište mi.
           </p>
           <div className="info-box">
-            <strong>E-mail podpory:</strong>
-            <br />
+            <strong>E-mail podpory:</strong>&nbsp;
             <Link href="mailto:kontakt@petrvurm.cz?subject=Bacha!%20-%20podpora">
               kontakt@petrvurm.cz
             </Link>

@@ -32,8 +32,7 @@ export default function DeleteAccountPage() {
             vaším účtem, můžete žádost poslat e-mailem.
           </p>
           <div className="info-box">
-            <strong>Žádost pošlete na:</strong>
-            <br />
+            <strong>Žádost pošlete na:</strong>&nbsp;
             <Link href="mailto:kontakt@petrvurm.cz?subject=Bacha!%20-%20smaz%C3%A1n%C3%AD%20%C3%BA%C4%8Dtu">
               kontakt@petrvurm.cz
             </Link>

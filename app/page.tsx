@@ -26,7 +26,7 @@ export default function HomePage() {
               <h1>
                 Než klikneš,
                 <br />
-                zkontroluj.
+                zkontroluj
               </h1>
               <p>
                 Osobní asistent proti podvodům. Prověřte zprávy, odkazy, QR kódy
