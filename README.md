@@ -10,6 +10,14 @@ Web Bacha! běží na Next.js App Routeru a je připravený pro nasazení na Ver
 
 `npm run build` vytvoří produkční build.
 
+## Server API Bacha!
+
+Projekt současně obsluhuje veřejný web a produkční API aplikace na `/api/v1/...`. API běží v Node.js Functions na Vercelu. Serverová logika a její testy jsou v `lib/server/bacha/` a `test/`; Firebase Cloud Functions už nejsou runtime této služby. Přehled endpointů a přesných JSON payloadů je v [API_CONTRACT.md](./API_CONTRACT.md), nasazení v [BACKEND_DEPLOY.md](./BACKEND_DEPLOY.md).
+
+Každé Android API volání vyžaduje Firebase ID token v `Authorization: Bearer ...` a Firebase App Check token v `X-Firebase-AppCheck`. Firebase Admin ověřuje oba tokeny; server vždy používá UID z ověřeného Auth tokenu. Chybějící nebo neplatné ověření je odmítnuto. Serverové proměnné nikdy nepoužívejte s prefixem `NEXT_PUBLIC_`.
+
+Produkční validace backendu: `npm run lint`, `npm test`, `npm run test:rules`, `npm run build`, `npm run check:client-secrets`, `npm run audit:critical`, `npm run audit:high` a `npm run audit:production`.
+
 ## Proměnné prostředí
 
 Nastavte stejné proměnné v lokálním prostředí i v projektu Vercel:
