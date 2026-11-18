@@ -14,6 +14,8 @@ Content-Type: application/json
 
 Server ověřuje ID token přes Firebase Admin `verifyIdToken(token, true)` a App Check token přes Firebase Admin `verifyToken`. UID pochází výhradně z ověřeného ID tokenu. Těla požadavků nikdy nepřenášejí autoritativní UID. Admin operace vyžadují claim `admin: true`.
 
+**Pokročilá analýza:** `POST /analyze` navíc vyžaduje přihlášeného neanonymního Firebase uživatele (anonymous -> 403). Limit Free je 5 úspěšných hloubkových kontrol za UTC měsíc, Plus 100. Limit se vyhodnocuje transakčně ve Firestore a neúspěšné provider volání se do kvóty nezapočítává. Lokální analýza Androidu se tím nemění.
+
 Úspěch vrací `{ "ok": true, ...data }`. Chyba vrací `{ "ok": false, "error": { "code": "...", "message": "..." } }`. Citlivé odpovědi mají `Cache-Control: no-store, max-age=0`.
 
 | Metoda a cesta | Požadavek | Odpověď |

@@ -2,7 +2,7 @@
 
 ## Architektura
 
-Veřejný web i API zůstávají v tomto Next.js App Router projektu. `/api/interest` dál zpracovává webový formulář, reCAPTCHA a Resend. Produkční Android API je `/api/v1/...`; route handlers běží na Node.js. Serverové moduly v `lib/server/bacha/` zachovávají dosavadní Firebase Functions logiku pro Gemini analýzu, threat intelligence, quota, billing, spory, watch listy a smazání účtu.
+Veřejný web i API zůstávají v tomto Next.js App Router projektu. `/api/interest` dál zpracovává webový formulář, reCAPTCHA a Resend. Produkční Android API je `/api/v1/...`; route handlers běží na Node.js. Serverové moduly v `lib/server/bacha/` zachovávají dosavadní Firebase Functions logiku pro OpenAI analýzu, threat intelligence, quota, billing, spory, watch listy a smazání účtu.
 
 Firebase zůstává autoritou pro Authentication (včetně anonymous), App Check/Play Integrity, Firestore, FCM, Remote Config, Analytics a Crashlytics. Firebase Admin SDK se inicializuje jako lazy singleton z Vercel secrets. Vercel poskytuje HTTP API a denní cron; Google Pub/Sub push posílá RTDN na HTTP endpoint.
 
@@ -15,8 +15,9 @@ Nastavte v Project Settings → Environment Variables pro Production a odpovída
 | `FIREBASE_PROJECT_ID` | Firebase/Google Cloud project ID |
 | `FIREBASE_ADMIN_CLIENT_EMAIL` | Service account e-mail používaný Firebase Admin |
 | `FIREBASE_ADMIN_PRIVATE_KEY` | Service account private key; zachovat nové řádky nebo escapované `\n` |
-| `GEMINI_API_KEY` | Gemini API key pro stávající model `gemini-2.5-flash` |
-| `THREAT_INTEL_HMAC_SECRET` | **Přesně stejná hodnota jako v produkčních Cloud Functions. Neměnit** — vytváří existující Firestore lookup keys |
+| `OPENAI_API_KEY` | Server-only OpenAI API key pro hloubkovou analýzu |
+| `OPENAI_MODEL` | Volitelný model, výchozí `gpt-5.4-mini` |
+| `THREAT_INTEL_HMAC_SECRET` | Stabilní náhodný secret (min. 32 znaků); neměnit po vytvoření Firestore lookup keys |
 | `WEB_RISK_API_KEY` | Google Web Risk; provider se při prázdné hodnotě přeskočí stejně jako dříve |
 | `PHISHTANK_API_KEY` | PhishTank; provider se při prázdné hodnotě přeskočí |
 | `URLHAUS_API_KEY` | URLhaus; provider se při prázdné hodnotě přeskočí |
@@ -51,9 +52,13 @@ firebase deploy --only firestore:rules,firestore:indexes
 
 Rules neudělují klientovi oprávnění k autoritativním datům. Quota, entitlement, purchase binding, hrozby a rate limits zapisuje Admin SDK.
 
-## Gemini a threat providers
+## OpenAI, registrované účty a threat providers
 
-Nastavte Gemini secret a používejte původní klíče providerů. `THREAT_INTEL_HMAC_SECRET` migrujte byte-for-byte ze stávajícího Firebase Secret Manageru; při změně se existující HMAC klíče indikátorů již nespárují. Provider timeouty a chování při výpadku zůstávají podle původního backendu.
+OpenAI API key je pouze serverový Vercel secret. Model `gpt-5.4-mini` podporuje text, vložené obrázky a strukturované JSON výstupy. Používáme Responses API, `store: false`, omezení délky vstupů, striktní schéma, sekundární validaci a oddělení nedůvěryhodného obsahu od systémových instrukcí. QR kódy se analyzují jako dekódovaný text/URL, případně doplněný o obrázek. Neprovádí se automatické otevírání QR URL.
+
+Pokročilá analýza vyžaduje platný Firebase Auth ID token, App Check a neanonymní Firebase přihlášení. Anonymous Auth dostane HTTP 403 před rezervací kvóty a před AI požadavkem. Firestore transakčně omezuje Free na 5 úspěšných analýz měsíčně, platný Plus na 100. Neplatná AI odpověď či timeout způsobí vrácení rezervace; lokální analýza Androidu zůstává bez kvóty. Přímo potvrzená známá hrozba může vrátit výsledek bez spotřeby kvóty.
+
+`THREAT_INTEL_HMAC_SECRET` uchovávejte na Vercelu; při nulových původních datech není třeba migrace z Google Secret Manageru. Provider keys Web Risk, PhishTank a URLhaus jsou volitelné. Zvažte OpenAI projektové limity, monitorování spotřeby a aktualizaci soukromí/Data Safety před vydáním.
 
 ## Google Play Developer API
 
@@ -84,11 +89,11 @@ Endpoint je `https://bacha.petrvurm.cz/api/v1/billing/rtdn`. Ověřuje Google OI
 ## Nasazení Vercel
 
 1. Připojte `ultronstudio/bacha_web` k existujícímu Vercel projektu a ponechte Next.js framework preset a root directory repository.
-2. Přidejte všechny produkční proměnné. Nejdřív zkontrolujte HMAC hodnotu proti běžícímu backendu.
+2. Přidejte všechny produkční proměnné, zejména `OPENAI_API_KEY`, Firebase Admin údaje a stabilní `THREAT_INTEL_HMAC_SECRET`.
 3. Vytvořte Preview secrets pro testovací Firebase/Play prostředí. Nepoužívejte production Play klíče pro nechráněné Preview URL.
 4. Spusťte CI a nasaďte preview deployment. Otestujte landing page, `/api/interest` s platným reCAPTCHA formulářem, Firebase auth/App Check, analýzu, threat lookup a zařízení.
 5. Nastavte produkční doménu `bacha.petrvurm.cz` a nasaďte Production. Potom aktivujte Play Pub/Sub push subscription.
-6. Před vypnutím původních Cloud Functions dokončete Android release migraci a ověřte produkční volání z Play Integrity buildu.
+6. Dokončete Android release migraci na `/api/v1` a ověřte produkční volání z Play Integrity buildu. Firebase Cloud Functions nejsou runtime této služby.
 
 Analýza může běžet do 120 sekund. Route používá Vercel Node.js Function `maxDuration: 120`; nejde o úlohu na pozadí. Vercel request body limit je menší než 4,5 MB a aplikace navíc odmítá body nad 3,5 MB; obrázkové limity zůstávají z původního backendu.
 
@@ -97,7 +102,7 @@ Analýza může běžet do 120 sekund. Route používá Vercel Node.js Function 
 1. `Copy-Item .env.example .env.local` a použijte oddělený Firebase test projekt a oddělené Play test credentials. Pro lokální Auth/Firestore emulator nastavte `FIREBASE_AUTH_EMULATOR_HOST=127.0.0.1:9099` a `FIRESTORE_EMULATOR_HOST=127.0.0.1:8080`; v Production jsou emulator hosty odmítnuty.
 2. Pro volání chráněného endpointu potřebujete platný Firebase Auth ID token a App Check token projektu; produkční bypass neexistuje. Debug App Check token musí být registrován ve Firebase Console.
 3. Spusťte `npm ci`, `npm run lint`, `npm test`, `npm run test:rules`, `npm run build`, `npm run check:client-secrets`, `npm run audit:critical`, `npm run audit:high` a `npm run audit:production`.
-4. Unit testy používají fake Firestore a mockované API odpovědi. Nevyžadují placené Gemini, Web Risk, PhishTank, URLhaus ani Google Play API keys.
+4. Unit testy používají fake Firestore a mockované API odpovědi. Nevyžadují placené OpenAI, Web Risk, PhishTank, URLhaus ani Google Play API keys.
 5. Rules testy používají lokální Firestore Emulator. K ověření HTTP/OIDC integrace vytvořte Preview deployment a Pub/Sub testovací topic; neposílejte testovací purchase tokeny na produkční účet.
 
 Webový formulář `/api/interest` si ponechává vlastní základní IP limiter v paměti, reCAPTCHA a Resend workflow. Není používán pro security API. Serverové API používá původní Firestore transakční `rateLimits` kolekci.
