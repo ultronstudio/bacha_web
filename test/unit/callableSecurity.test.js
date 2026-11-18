@@ -2,7 +2,7 @@
 const { test, describe } = require("node:test");
 const assert = require("node:assert/strict");
 require("../helpers/setup");
-const { requireIdentityWith, requireAdmin, ApiError } = require("../../lib/server/bacha/authCore");
+const { requireIdentityWith, requireAdmin, requireRegisteredForAnalysis, ApiError } = require("../../lib/server/bacha/authCore");
 const { enforceRateLimit, RateLimitError, RATE_LIMITS } = require("../../lib/server/bacha/rateLimit");
 const { freshDb } = require("../helpers/setup");
 
@@ -32,6 +32,21 @@ describe("REST request security", () => {
     });
     await assert.rejects(requireIdentityWith(request, { verifyIdToken: async () => { throw new Error("invalid"); } }, { verifyToken: async () => ({}) }), (e) => e.status === 401);
     await assert.rejects(requireIdentityWith(request, { verifyIdToken: async () => validIdentity }, { verifyToken: async () => { throw new Error("invalid"); } }), (e) => e.status === 401);
+  });
+
+  test("anonymous Firebase user cannot invoke advanced analysis", () => {
+    for (const identity of [null, {}, { uid: "u", firebase: { sign_in_provider: "anonymous" } }]) {
+      assert.throws(() => requireRegisteredForAnalysis(identity), e => e instanceof ApiError && e.status === 403);
+    }
+    for (const provider of ["google.com", "password", "apple.com"]) {
+      assert.equal(requireRegisteredForAnalysis({ uid: "u", firebase: { sign_in_provider: provider } }).uid, "u");
+    }
+  });
+
+  test("analyze route checks registered sign-in before quota", () => {
+    const src = require("node:fs").readFileSync(require("node:path").join(__dirname, "../../lib/server/bacha/httpApi.ts"), "utf8");
+    const route = src.slice(src.indexOf('if (path === "analyze"'));
+    assert.ok(route.indexOf("requireRegisteredForAnalysis(identity)") < route.indexOf('enforceRateLimit(firestore, uid, "analyzeContent")'));
   });
 
   test("admin operations require the verified admin custom claim", () => {

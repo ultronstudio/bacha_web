@@ -14,7 +14,9 @@ Web Bacha! běží na Next.js App Routeru a je připravený pro nasazení na Ver
 
 Projekt současně obsluhuje veřejný web a produkční API aplikace na `/api/v1/...`. API běží v Node.js Functions na Vercelu. Serverová logika a její testy jsou v `lib/server/bacha/` a `test/`; Firebase Cloud Functions už nejsou runtime této služby. Přehled endpointů a přesných JSON payloadů je v [API_CONTRACT.md](./API_CONTRACT.md), nasazení v [BACKEND_DEPLOY.md](./BACKEND_DEPLOY.md).
 
-Každé Android API volání vyžaduje Firebase ID token v `Authorization: Bearer ...` a Firebase App Check token v `X-Firebase-AppCheck`. Firebase Admin ověřuje oba tokeny; server vždy používá UID z ověřeného Auth tokenu. Chybějící nebo neplatné ověření je odmítnuto. Serverové proměnné nikdy nepoužívejte s prefixem `NEXT_PUBLIC_`.
+Každé Android API volání vyžaduje Firebase ID token v `Authorization: Bearer ...` a Firebase App Check token v `X-Firebase-AppCheck`. Firebase Admin ověřuje oba tokeny; server vždy používá UID z ověřeného Auth tokenu. Chybějící nebo neplatné ověření je odmítnuto. Hloubková analýza `POST /api/v1/analyze` navíc odmítá anonymní Firebase účet: anonymní = 0 analýz; přihlášený Free = 5; validní Plus = 100 úspěšných hloubkových kontrol za kalendářní měsíc (UTC). Kvóty jsou transakční, při selhání AI se rezervace vrací. Lokální Android analýza zůstává dostupná i anonymně. Serverové proměnné nikdy nepoužívejte s prefixem `NEXT_PUBLIC_`.
+
+OpenAI multimodální analýza používá Responses API, striktní JSON schema, `store: false`, text a obrázky (JPEG/PNG/WebP). Přenesený obsah může zpracovat OpenAI; viz zásady soukromí. `OPENAI_API_KEY` nastavujte pouze na serveru ve Vercelu; před vydáním ověřte OpenAI účtování i náklady.
 
 Produkční validace backendu: `npm run lint`, `npm test`, `npm run test:rules`, `npm run build`, `npm run check:client-secrets`, `npm run audit:critical`, `npm run audit:high` a `npm run audit:production`.
 

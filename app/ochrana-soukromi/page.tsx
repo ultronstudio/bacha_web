@@ -70,6 +70,17 @@ export default function PrivacyPage() {
             nesbírá historii prohlížení. Obsah, který sami odešlete k prověření,
             může být zpracován pouze za účelem provedení požadované kontroly.
           </p>
+          <h2>Hloubková AI analýza</h2>
+          <p>
+            Po výslovném spuštění hloubkové kontroly přihlášeným uživatelem
+            odešle server zadaný text, odkaz, dekódovaný obsah QR kódu nebo
+            vybraný obrázek poskytovateli OpenAI za účelem analýzy možného
+            podvodu. Při požadavku používá server parametr store: false,
+            který nevytváří uloženou konverzaci pro následné využití API;
+            tím však nejsou vyloučeny další doby zpracování a uchování podle
+            platných podmínek poskytovatele. Základní lokální kontrola
+            může běžet bez přihlášení a bez odeslání obsahu do OpenAI.
+          </p>
           <h2>Kontakt</h2>
           <p>
             S dotazy k soukromí můžete napsat na{" "}

@@ -2,9 +2,9 @@ import "server-only";
 
 import type { DecodedIdToken } from "firebase-admin/auth";
 import { firebaseAppCheck, firebaseAuth } from "./firebaseAdmin";
-import { ApiError, errorResponse, jsonResponse, readJson, requireAdmin, requireIdentityWith } from "./authCore.js";
+import { ApiError, errorResponse, jsonResponse, readJson, requireAdmin, requireRegisteredForAnalysis, requireIdentityWith } from "./authCore.js";
 
-export { ApiError, errorResponse, jsonResponse, readJson, requireAdmin };
+export { ApiError, errorResponse, jsonResponse, readJson, requireAdmin, requireRegisteredForAnalysis };
 
 export async function requireIdentity(request: Request): Promise<DecodedIdToken> {
   if (!/^Bearer\s+.+$/i.test(request.headers.get("authorization") || "")) {

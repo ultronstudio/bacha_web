@@ -1,7 +1,7 @@
 import "server-only";
 
 import { OAuth2Client } from "google-auth-library";
-import { GoogleGenAI } from "@google/genai";
+import { generateOpenAi } from "./openaiClient.js";
 import { google } from "googleapis";
 import type { Firestore } from "firebase-admin/firestore";
 import { deleteAllUserData } from "./accountDeletion.js";
@@ -17,7 +17,7 @@ import { validateDeviceId, validateDevicePayload } from "./deviceValidation.js";
 import { decodePubSubRtdn } from "./rtdnPayload.js";
 import { verifyPubSubOidc } from "./rtdnAuth.js";
 import * as limits from "./limits.js";
-import { ApiError, errorResponse, jsonResponse, readJson, requireAdmin, requireIdentity } from "./auth";
+import { ApiError, errorResponse, jsonResponse, readJson, requireAdmin, requireRegisteredForAnalysis, requireIdentity } from "./auth";
 
 const playClient = () => {
   const email = requireSecret("PLAY_SERVICE_ACCOUNT_EMAIL");
@@ -44,22 +44,6 @@ function providers() {
   ];
 }
 
-function geminiGenerate() {
-  const ai = new GoogleGenAI({ apiKey: requireSecret("GEMINI_API_KEY") });
-  return async ({ model, systemInstruction, responseSchema, userPrompt, image }: {
-    model: string; systemInstruction: string; responseSchema: object; userPrompt: string;
-    image: { mimeType: string; base64: string } | null;
-  }) => {
-    const parts: Array<Record<string, unknown>> = [{ text: userPrompt }];
-    if (image) parts.push({ inlineData: { mimeType: image.mimeType, data: image.base64 } });
-    const response = await ai.models.generateContent({
-      model,
-      contents: [{ role: "user", parts }],
-      config: { systemInstruction, responseMimeType: "application/json", responseSchema, temperature: 0.1, maxOutputTokens: 2048 },
-    });
-    return response.text;
-  };
-}
 
 async function routeOperation(request: Request, segments: string[]) {
   const identity = await requireIdentity(request);
@@ -69,9 +53,10 @@ async function routeOperation(request: Request, segments: string[]) {
   const path = segments.join("/");
 
   if (path === "analyze" && method === "POST") {
+    requireRegisteredForAnalysis(identity);
     await enforceRateLimit(firestore, uid, "analyzeContent");
     const input = limits.validateAnalyzeRequest(await readJson(request));
-    const result = await analyzeContent({ db: firestore, generate: geminiGenerate(), providers: providers() }, uid, input);
+    const result = await analyzeContent({ db: firestore, generate: generateOpenAi, providers: providers() }, uid, input);
     return jsonResponse(200, { ok: true, ...result });
   }
   if (path === "threats/lookup" && method === "POST") {
