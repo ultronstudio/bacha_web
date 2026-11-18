@@ -6,7 +6,7 @@ import { google } from "googleapis";
 import type { Firestore } from "firebase-admin/firestore";
 import { deleteAllUserData } from "./accountDeletion.js";
 import { deleteAccountAfterRateLimit } from "./accountDeletionRoute.js";
-import { analyzeContent } from "./analysisService.js";
+import { handleAnalyzeHttp } from "./analyzeHttp.js";
 import * as billing from "./billing.js";
 import { requireSecret, optionalSecret } from "./config.js";
 import { firestore as getFirestore, firebaseAuth } from "./firebaseAdmin";
@@ -17,7 +17,7 @@ import { validateDeviceId, validateDevicePayload } from "./deviceValidation.js";
 import { decodePubSubRtdn } from "./rtdnPayload.js";
 import { verifyPubSubOidc } from "./rtdnAuth.js";
 import * as limits from "./limits.js";
-import { ApiError, errorResponse, jsonResponse, readJson, requireAdmin, requireRegisteredForAnalysis, requireIdentity } from "./auth";
+import { ApiError, errorResponse, jsonResponse, readJson, requireAdmin, requireIdentity } from "./auth";
 
 const playClient = () => {
   const email = requireSecret("PLAY_SERVICE_ACCOUNT_EMAIL");
@@ -53,11 +53,7 @@ async function routeOperation(request: Request, segments: string[]) {
   const path = segments.join("/");
 
   if (path === "analyze" && method === "POST") {
-    requireRegisteredForAnalysis(identity);
-    await enforceRateLimit(firestore, uid, "analyzeContent");
-    const input = limits.validateAnalyzeRequest(await readJson(request));
-    const result = await analyzeContent({ db: firestore, generate: generateOpenAi, providers: providers() }, uid, input);
-    return jsonResponse(200, { ok: true, ...result });
+    return handleAnalyzeHttp({ request, identity, db: firestore, generate: generateOpenAi, providers: providers() });
   }
   if (path === "threats/lookup" && method === "POST") {
     await enforceRateLimit(firestore, uid, "lookupThreatIndicators");

@@ -18,6 +18,8 @@ Každé Android API volání vyžaduje Firebase ID token v `Authorization: Beare
 
 OpenAI multimodální analýza používá Responses API, striktní JSON schema, `store: false`, text a obrázky (JPEG/PNG/WebP). Přenesený obsah může zpracovat OpenAI; viz zásady soukromí. `OPENAI_API_KEY` nastavujte pouze na serveru ve Vercelu; před vydáním ověřte OpenAI účtování i náklady.
 
+Offline API smoke test: `npm run test:smoke` simuluje celý požadavek na hloubkovou analýzu v paměti (ověření Firebase Auth + App Check, anonymní/Free/Plus, Firestore kvóty, validace, OpenAI Responses API pomocí HTTP mocku a vrácení kvóty při chybě). Nevolá žádnou externí službu, nepoužívá Vercel secrets ani reálný OpenAI kredit. Samostatný GitHub Actions workflow **Offline AI Smoke** lze spustit ručně z Actions → Run workflow, spouští se také při PR změnách analyzačního backendu.
+
 Produkční validace backendu: `npm run lint`, `npm test`, `npm run test:rules`, `npm run build`, `npm run check:client-secrets`, `npm run audit:critical`, `npm run audit:high` a `npm run audit:production`.
 
 ## Proměnné prostředí

@@ -43,10 +43,14 @@ describe("REST request security", () => {
     }
   });
 
-  test("analyze route checks registered sign-in before quota", () => {
-    const src = require("node:fs").readFileSync(require("node:path").join(__dirname, "../../lib/server/bacha/httpApi.ts"), "utf8");
-    const route = src.slice(src.indexOf('if (path === "analyze"'));
-    assert.ok(route.indexOf("requireRegisteredForAnalysis(identity)") < route.indexOf('enforceRateLimit(firestore, uid, "analyzeContent")'));
+  test("HTTP route delegates to the same registered-only analysis pipeline tested offline", () => {
+    const fs = require("node:fs");
+    const path = require("node:path");
+    const route = fs.readFileSync(path.join(__dirname, "../../lib/server/bacha/httpApi.ts"), "utf8");
+    const handler = fs.readFileSync(path.join(__dirname, "../../lib/server/bacha/analyzeHttp.js"), "utf8");
+    assert.match(route, /return handleAnalyzeHttp\(\{ request, identity, db: firestore/);
+    assert.ok(handler.indexOf("requireRegisteredForAnalysis(identity)") >= 0);
+    assert.ok(handler.indexOf("requireRegisteredForAnalysis(identity)") < handler.indexOf('enforceRateLimit(db, identity.uid, "analyzeContent"'));
   });
 
   test("admin operations require the verified admin custom claim", () => {

@@ -1,0 +1,28 @@
+name: Offline AI smoke
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "lib/server/bacha/**"
+      - "test/smoke/**"
+      - "package.json"
+      - ".github/workflows/offline-ai-smoke.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  offline-ai-smoke:
+    name: Local HTTP / Auth / Free / Plus / OpenAI mock
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Run local request-level smoke (no provider credentials)
+        run: npm run test:smoke
