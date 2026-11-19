@@ -56,7 +56,7 @@ function statePage(state: string, token?: string) {
 /** GET never consumes tokens: mail scanners and link previews are harmless. */
 export async function GET(request: NextRequest) {
   const token = request.nextUrl.searchParams.get("token");
-  if (!tokenId(token)) return statePage("invalid");
+  if (!token || !tokenId(token)) return statePage("invalid");
   try {
     const state = await getVerificationState(firestore(), token);
     return statePage(state, state === "ready" ? token : undefined);
