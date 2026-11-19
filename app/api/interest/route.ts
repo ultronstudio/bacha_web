@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { firestore } from "@/lib/server/bacha/firebaseAdmin";
 import { sendInterestConfirmation } from "@/lib/server/interestEmail";
 import {
-  normalizeTesterEmail, createToken, tokenId,
+  normalizeTesterEmail, createToken,
   enforceInterestLimits, createPendingVerification,
 } from "@/lib/server/interestVerification";
 
@@ -88,7 +88,7 @@ export async function POST(request: NextRequest) {
     return reply(200, true, "Pokud byla žádost přijata, zašleme ověřovací odkaz.");
   }
   const checked = normalizeTesterEmail(submission.mail, process.env.INTEREST_BLOCKED_EMAIL_DOMAINS || "");
-  if (checked.error === "invalid") return reply(422, false, "Zadejte platnou e-mailovou adresu.");
+  if (checked.error === "invalid" || !checked.email) return reply(422, false, "Zadejte platnou e-mailovou adresu.");
   if (checked.error === "disposable") {
     return reply(422, false, "Dočasné e-mailové schránky nejsou pro uzavřené testování povolené. Použijte stálou adresu.");
   }
