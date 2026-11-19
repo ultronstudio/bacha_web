@@ -3,7 +3,7 @@ import "server-only";
 import type { DecodedIdToken } from "firebase-admin/auth";
 import { firebaseAppCheck, firebaseAuth, firestore } from "./firebaseAdmin";
 import { ApiError, errorResponse, jsonResponse, readJson, requireAdmin, requireRegisteredForAnalysis, requireIdentityWith } from "./authCore.js";
-import { verifySession } from "./serverSessions.js";
+import { verifySession, isAdminUid } from "./serverSessions.js";
 
 export { ApiError, errorResponse, jsonResponse, readJson, requireAdmin, requireRegisteredForAnalysis };
 
@@ -24,7 +24,7 @@ export async function requireIdentity(request: Request): Promise<DecodedIdToken>
     }
     const session = await verifySession(firestore(), match[1], appId);
     if (!session) throw new ApiError(401, "unauthenticated", "Relace vypršela.");
-    return session as unknown as DecodedIdToken;
+    return { ...session, admin: isAdminUid(session.uid) } as unknown as DecodedIdToken;
   }
 
   // Staged rollout: old Play builds use Firebase Auth; stop accepting these
