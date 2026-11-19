@@ -4,17 +4,26 @@ Base URL: `https://bacha.petrvurm.cz/api/v1/`. JSON requesty i response použív
 
 ## Ověření
 
-Všechny endpointy pod `/api/v1`, kromě RTDN receiveru, vyžadují:
+Nový Android klient používá vlastní backendovou relaci a hlavičky:
 
 ```http
-Authorization: Bearer <Firebase ID token>
+Authorization: Bearer <ba_a_access_token>
 X-Firebase-AppCheck: <Firebase App Check token>
 Content-Type: application/json
 ```
 
-Server ověřuje ID token přes Firebase Admin `verifyIdToken(token, true)` a App Check token přes Firebase Admin `verifyToken`. UID pochází výhradně z ověřeného ID tokenu. Těla požadavků nikdy nepřenášejí autoritativní UID. Admin operace vyžadují claim `admin: true`.
+Google Sign-In běží přes Credential Manager, který předá Google ID token pouze na `POST /auth/google` (bez `Authorization`, stále vyžaduje App Check). Backend ověřuje token podpisem a povinnou audience, issuerem, expirací a `email_verified`, zkontroluje uzavřený seznam testerů a vydá vlastní krátkodobý access + rotující refresh token. **Nový uživatel se nevytváří ve Firebase Authentication.**
 
-**Pokročilá analýza:** `POST /analyze` navíc vyžaduje přihlášeného neanonymního Firebase uživatele (anonymous -> 403). Limit Free je 5 úspěšných hloubkových kontrol za UTC měsíc, Plus 100. Limit se vyhodnocuje transakčně ve Firestore a neúspěšné provider volání se do kvóty nezapočítává. Lokální analýza Androidu se tím nemění.
+Při přechodu stávajících Android verzí zůstává volitelná kompatibilita s Firebase ID tokenem (`BACHA_LEGACY_FIREBASE_AUTH=1`); po rollout nastavit `0`. UID je vždy odvozené serverově z ověřené Google identity, pro existující Google-linked Firebase uživatele se zachovává původní UID. Server i nadále ověřuje App Check pro každý požadavek a nepřijímá UID z klientského payloadu. Admin operace pro nové backendové relace vyžadují explicitní `BACHA_ADMIN_UIDS` v zabezpečeném Vercel prostředí.
+
+| Metoda a cesta | Požadavek | Odpověď |
+| --- | --- | --- |
+| `POST /auth/google` | `{ idToken }` + App Check | `{ ok, accessToken, refreshToken, accessExpiresAtMillis, refreshExpiresAtMillis, user }` |
+| `POST /auth/refresh` | `{ refreshToken }` + App Check | nové rotované tokeny (absolutní expiry relace) |
+| `POST /auth/logout` | access token + App Check | `{ ok:true, success:true }`; relace revokována |
+| `GET /me` | access token + App Check | `{ ok, user, entitlement, usage }` |
+
+**Pokročilá analýza:** `POST /analyze` navíc vyžaduje přihlášeného uživatele backendu (lokální host -> bez access tokenu, HTTP 401). Limit Free je 5 úspěšných hloubkových kontrol za UTC měsíc, Plus 100. Limit se vyhodnocuje transakčně ve Firestore a neúspěšné provider volání se do kvóty nezapočítává. Lokální analýza Androidu se tím nemění.
 
 Úspěch vrací `{ "ok": true, ...data }`. Chyba vrací `{ "ok": false, "error": { "code": "...", "message": "..." } }`. Citlivé odpovědi mají `Cache-Control: no-store, max-age=0`.
 
