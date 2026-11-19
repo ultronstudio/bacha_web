@@ -8,7 +8,7 @@ import { deleteAllUserData } from "./accountDeletion.js";
 import { deleteAccountAfterRateLimit } from "./accountDeletionRoute.js";
 import { handleAnalyzeHttp } from "./analyzeHttp.js";
 import * as billing from "./billing.js";
-import { requireSecret, optionalSecret } from "./config.js";
+import { requireSecret, optionalSecret, FREE_MONTHLY_LIMIT, PLUS_MONTHLY_LIMIT } from "./config.js";
 import { firestore as getFirestore, firebaseAuth, firebaseAppCheck } from "./firebaseAdmin";
 import { handleAuthHttp } from "./authHttp.js";
 import { getCurrentPeriod } from "./analysisService.js";
@@ -89,8 +89,8 @@ async function routeOperation(request: Request, segments: string[]) {
       } : null,
       usage: usageSnap.exists ? {
         deepAnalysisCount: Number(usage.deepAnalysisCount || 0),
-        monthlyLimit: Number(usage.monthlyLimit || 0),
-      } : { deepAnalysisCount: 0, monthlyLimit: 0 },
+        monthlyLimit: billing.entitlementGrantsPlus(ent, Date.now()) ? PLUS_MONTHLY_LIMIT : FREE_MONTHLY_LIMIT,
+      } : { deepAnalysisCount: 0, monthlyLimit: billing.entitlementGrantsPlus(ent, Date.now()) ? PLUS_MONTHLY_LIMIT : FREE_MONTHLY_LIMIT },
     });
   }
 
