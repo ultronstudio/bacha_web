@@ -13,6 +13,7 @@ import { firestore as getFirestore, firebaseAuth, firebaseAppCheck } from "./fir
 import { handleAuthHttp } from "./authHttp.js";
 import { getCurrentPeriod } from "./analysisService.js";
 import { enforceRateLimit } from "./rateLimit.js";
+import { enforceBetaAccess, enforceApiIpRateLimit } from "./apiAbuseProtection.js";
 import * as threatIntel from "./threatIntel.js";
 import { fs } from "./fsHelpers.js";
 import { validateDeviceId, validateDevicePayload } from "./deviceValidation.js";
@@ -65,6 +66,9 @@ async function routeOperation(request: Request, segments: string[]) {
   const uid = identity.uid;
   const firestore = getFirestore();
   const method = request.method.toUpperCase();
+  // Separate from Firebase Auth sign-up limits; these quotas protect Vercel API.
+  enforceBetaAccess(uid, method, path);
+  await enforceApiIpRateLimit(firestore, request, method, path);
   if (path === "me" && method === "GET") {
     const userSnap = await firestore.collection("users").doc(uid).get();
     const entitlementSnap = await firestore.collection("users").doc(uid).collection("entitlement").doc("current").get();
