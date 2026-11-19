@@ -35,7 +35,19 @@ Vercel přepisuje `X-Forwarded-For` na edge; `auth/google` má sdílený transak
 2. V Preview otestovat povolené Google přihlášení, odmítnutý neznámý účet (žádný záznam Firebase Auth ani Firestore), serverovou obnovu tokenu, odhlášení, různé `appId`, data `/me`, FCM a Billing.
 3. Přidat výše uvedené produkční proměnné **před** nasazením backendu. Poté nasadit backend a ponechat `BACHA_LEGACY_FIREBASE_AUTH=1`.
 4. Změny Androidu vydat interním testerům; zachovat vlastním testem UID a Bacha!+ ověření po přihlášení.
-5. Teprve po potvrzení migrace nastavit `BACHA_LEGACY_FIREBASE_AUTH=0`, odebrat přímá klientská Firestore Auth rules a případně vypnout Google/Firebase Anonymous providers ve Firebase Authentication. `Enable create (sign-up)` zůstane vypnuté – nový backend jej nepotřebuje.
+5. Teprve po potvrzení migrace nastavit `BACHA_LEGACY_FIREBASE_AUTH=0` a nasadit připravená přísná pravidla `firestore/backend-only.rules` podle postupu níže. Poté případně vypnout Google/Firebase Anonymous providers ve Firebase Authentication. `Enable create (sign-up)` zůstane vypnuté – nový backend jej nepotřebuje.
+
+### Finální Firestore security rules (až po migraci všech klientů)
+
+Pro **bezpečný rollout** je výchozí `firebase.json` záměrně stále přechodný a obsahuje původní pravidla čtení vlastních dat. Produkční uživatelské APK s FirebaseAuth a FirebaseFirestore je stále používají. Nová konfigurace `firebase.backend-only.json` odkazuje na přísná pravidla `firestore/backend-only.rules`, která odmítají **všechny přímé SDK požadavky** (včetně starých přihlášených Firebase účtů). Nová aplikace komunikuje pouze přes serverové API; Admin SDK rules obchází.
+
+**Až po úspěšném vydání klienta a ukončení legacy fallbacku:**
+
+```powershell
+npx firebase deploy --only firestore:rules --config firebase.backend-only.json --project bacha-security-prod
+```
+
+Neprovádět dříve, protože to přeruší čtení entitlement/usage ve starých vydaných APK. Příkaz nasadí bezpečnostní pravidla, nikoli databázi či kolekce. Nová testovací sada `test/rules/backend-only.rules.test.js` v CI ověřuje, že klientská SDK nedokážou číst ani zapisovat uživatelské profily, relace, data plateb či zprávy o hrozbách.
 
 **Nezapínat Firebase Authentication blocking functions z PR #6**: tato varianta používá backendovou registraci a nepotřebuje placené Identity Platform hooks. IP ochrana backend API může být nasazena nezávisle.
 
