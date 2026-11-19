@@ -106,7 +106,7 @@ export default function TestingModal({ siteKey }: { siteKey: string }) {
         );
       setStatus({
         type: "success",
-        message: payload.message || "Díky. Zájem o testování byl odeslán.",
+        message: payload.message || "Zkontrolujte e-mail a potvrďte svůj zájem o testování.",
       });
       form.reset();
       form.classList.remove("was-validated");
@@ -164,7 +164,7 @@ export default function TestingModal({ siteKey }: { siteKey: string }) {
               <div className="modal-body px-4 py-4">
                 <div className="mb-3">
                   <label htmlFor="testing-email" className="form-label">
-                    E-mail pro Google účet
+                    E-mail vašeho Google účtu
                   </label>
                   <input
                     type="email"
@@ -195,7 +195,7 @@ export default function TestingModal({ siteKey }: { siteKey: string }) {
                   <div ref={widgetRef} id="recaptcha-widget" />
                 </div>
                 <p className="captcha-note small mb-3">
-                  Odesláním předáte svůj e-mail pouze pro účely kontaktování
+                  Na tuto adresu nejprve odešleme ověřovací odkaz. E-mail zpracujeme pouze pro účely kontaktování
                   ohledně testování <b>Bacha!</b>.
                 </p>
                 <div
@@ -220,7 +220,7 @@ export default function TestingModal({ siteKey }: { siteKey: string }) {
                   type="submit"
                   disabled={sending}
                 >
-                  {sending ? "Odesílám…" : "Odeslat zájem"}
+                  {sending ? "Odesílám…" : "Poslat ověřovací e-mail"}
                 </button>
               </div>
             </form>
