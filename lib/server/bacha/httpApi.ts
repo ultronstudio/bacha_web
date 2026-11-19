@@ -90,7 +90,7 @@ async function routeOperation(request: Request, segments: string[]) {
         productId: ent.productId || null, basePlanId: ent.basePlanId || null,
         expiryTimeMillis: ent.expiryTimeMillis || null, autoRenewing: ent.autoRenewing === true,
         verifiedAtMillis: ent.verifiedAtMillis || null,
-      } : null,
+      } : { tier: "FREE", status: "FREE" },
       usage: usageSnap.exists ? {
         deepAnalysisCount: Number(usage.deepAnalysisCount || 0),
         monthlyLimit: billing.entitlementGrantsPlus(ent, Date.now()) ? PLUS_MONTHLY_LIMIT : FREE_MONTHLY_LIMIT,
