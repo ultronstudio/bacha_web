@@ -4,22 +4,40 @@
       "collectionGroup": "threatIndicators",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "active", "order": "ASCENDING" },
-        { "fieldPath": "expiresAt", "order": "ASCENDING" }
+        {
+          "fieldPath": "active",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "expiresAt",
+          "order": "ASCENDING"
+        }
       ]
     },
     {
       "collectionGroup": "threatWatches",
       "queryScope": "COLLECTION",
       "fields": [
-        { "fieldPath": "lookupKey", "order": "ASCENDING" },
-        { "fieldPath": "enabled", "order": "ASCENDING" }
+        {
+          "fieldPath": "lookupKey",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "enabled",
+          "order": "ASCENDING"
+        }
       ]
     }
   ],
   "fieldOverrides": [
     {
       "collectionGroup": "rateLimits",
+      "fieldPath": "expiresAt",
+      "ttl": true,
+      "indexes": []
+    },
+    {
+      "collectionGroup": "testingInterestVerifications",
       "fieldPath": "expiresAt",
       "ttl": true,
       "indexes": []
