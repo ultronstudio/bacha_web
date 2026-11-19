@@ -8,7 +8,7 @@ import { verifySession } from "./serverSessions.js";
 export { ApiError, errorResponse, jsonResponse, readJson, requireAdmin, requireRegisteredForAnalysis };
 
 export async function requireIdentity(request: Request): Promise<DecodedIdToken> {
-  const match = /^Bearer\\s+(.+)$/i.exec(request.headers.get("authorization") || "");
+  const match = /^Bearer\s+(.+)$/i.exec(request.headers.get("authorization") || "");
   if (!match) throw new ApiError(401, "unauthenticated", "Chybí platná relace.");
   const appToken = request.headers.get("x-firebase-appcheck");
   if (!appToken) throw new ApiError(401, "unauthenticated", "Chybí ověření aplikace.");
@@ -24,7 +24,7 @@ export async function requireIdentity(request: Request): Promise<DecodedIdToken>
     }
     const session = await verifySession(firestore(), match[1], appId);
     if (!session) throw new ApiError(401, "unauthenticated", "Relace vypršela.");
-    return session as DecodedIdToken;
+    return session as unknown as DecodedIdToken;
   }
 
   // Staged rollout: old Play builds use Firebase Auth; stop accepting these
