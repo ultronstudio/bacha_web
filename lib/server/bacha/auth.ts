@@ -3,7 +3,7 @@ import "server-only";
 import type { DecodedIdToken } from "firebase-admin/auth";
 import { firebaseAppCheck, firebaseAuth, firestore } from "./firebaseAdmin";
 import { ApiError, errorResponse, jsonResponse, readJson, requireAdmin, requireRegisteredForAnalysis, requireIdentityWith } from "./authCore.js";
-import { verifySession, isAdminUid } from "./serverSessions.js";
+import { verifySession, isAdminUid, allowedEmail } from "./serverSessions.js";
 
 export { ApiError, errorResponse, jsonResponse, readJson, requireAdmin, requireRegisteredForAnalysis };
 
@@ -32,7 +32,13 @@ export async function requireIdentity(request: Request): Promise<DecodedIdToken>
   if (process.env.BACHA_LEGACY_FIREBASE_AUTH === "0") {
     throw new ApiError(401, "unauthenticated", "Je potřeba aktualizovat aplikaci.");
   }
-  return requireIdentityWith(request, firebaseAuth(), firebaseAppCheck());
+  const legacy = await requireIdentityWith(request, firebaseAuth(), firebaseAppCheck());
+  if (process.env.BACHA_AUTH_MODE !== "open" &&
+      (legacy.firebase?.sign_in_provider !== "google.com" || legacy.email_verified !== true ||
+       !allowedEmail(legacy.email))) {
+    throw new ApiError(403, "permission-denied", "Tento Google účet není schválen pro testování.");
+  }
+  return legacy;
 }
 
 export const noStoreHeaders = { "Cache-Control": "no-store, max-age=0" };
