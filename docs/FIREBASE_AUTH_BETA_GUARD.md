@@ -37,20 +37,15 @@ Při deployi se Firebase CLI zeptá na parametr `BETA_APPROVED_GOOGLE_EMAILS`. V
 
 **Stávajících osm neznámých Google účtů** funkce zpětně nevymaže ani neodvolá vydané ID tokeny. Před deaktivací zapište UID a čas přihlášení pro audit. Poté neznámým účtům zakažte přístup v Firebase Authentication (Disable user), případně revoke refresh tokens; nevytvářejte doklady identity pouze z podobnosti názvů e-mailů.
 
-### C. Ochrana bacha_web (volitelná, nezávislá)
+### C. Ochrana bacha_web (nezávislá)
 
-V `lib/server/bacha/apiAccessGuard.js` je připravena druhá vrstva:
+`lib/server/bacha/apiAbuseProtection.js` doplňuje ověřování Firebase ID a App Check. Není to ochrana registračního endpointu Firebase Authentication.
 
-| Vercel environment proměnná | Příklad | Význam |
-|---|---|---|
-| `BETA_ACCESS_MODE` | `closed` | Zapne povinný UID whitelist API. Výchozí `open` je beze změny. |
-| `BETA_ALLOWED_UIDS` | `uid-provozovatele,uid-testera` | Přesný seznam povolených UID (minimálně vlastní účet!). |
-| `API_IP_RATE_LIMIT_ENABLED` | `1` | Zapne transakční IP limit Vercel API. |
-| `API_IP_RATE_LIMIT_PER_15M` | `100` | Počet požadavků / 15 minut / IP. Platí pro celé API včetně čtení; limit 100 může být nízký při velkém provozu. |
+- **Distribuované IP limity:** backend automaticky používá rozumné kvóty podle typu požadavku (např. analýza, registrace zařízení, watch, billing). IP ověřuje jen z platformou řízeného `X-Forwarded-For` ve Vercelu, uchovává HMAC, nikoli otevřenou IP. Firestore transakce + existující TTL pro `rateLimits` sdílí kvóty napříč instancemi. Ve vývojovém prostředí bez Vercelu se limity pro lokální testování přeskočí, produkce při chybě důvěryhodné IP selže bezpečně.
+- **Volitelný UID whitelist:** nastavte na Vercelu `BACHA_BETA_ALLOWED_UIDS=uid-provozovatele,uid-schvaleneho-testera`. Chybějící proměnná znamená otevřenou verzi (neuzamkne klienty při deployi). Ochrana se netýká účtu Firebase Authentication, ale zamítá cloudové API pro ostatní UID; smazání účtu a odregistrování zařízení zůstávají dostupné.
+- **Vercel Firewall:** pro omezení úplně neověřených požadavků použijte pravidla na okraji platformy (WAF). Backend musí nejprve ověřit identitu, teprve potom transakčně čerpá per-IP kvótu. IP limit na Vercelu nikdy neblokuje přímé volání Firebase Auth.
 
-Tato vrstva běží **až po ověření Firebase ID + App Check**; k omezení neověřených požadavků použijte i Vercel Firewall na vstupu. IP bere pouze z platformou přepsané `X-Forwarded-For` (Vercel), nikdy z nedůvěryhodného vlastní proxy. Limity jsou sdílené mezi serverless instancemi přes Firestore transakce, identifikátor IP je pouze HMAC a TTL existuje v `rateLimits.expiresAt`. Tím však **nevzniká whitelist Firebase Authentication**.
-
-**Pozor:** whitelist API podle UID není propojený s allowlistem e-mailů ve Firebase funkcích. Kdo smí do Auth, nemusí automaticky smět do API. Aktualizujte oba seznamy řízeně.
+**Pozor:** whitelist API podle UID není automaticky propojený s allowlistem e-mailů ve Firebase funkcích. Při přidání schváleného testera zkontrolujte obojí.
 
 ### D. Bezpečnostní kontrola
 
