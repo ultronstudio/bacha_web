@@ -28,7 +28,7 @@ Nastavte v Project Settings → Environment Variables pro Production a odpovída
 | `CRON_SECRET` | Náhodná dlouhá hodnota použitá jako Vercel Cron bearer secret |
 | `FIREBASE_EMULATOR_HOST` | Volitelné pouze pro lokální vývoj; nikdy nenastavovat v produkci |
 
-Webové proměnné současného formuláře zůstávají beze změny: `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`, `RECAPTCHA_SECRET_KEY`, `RECAPTCHA_EXPECTED_HOSTNAME`, `RESEND_API_KEY`, `APP_ORIGIN`, `ALLOWED_ORIGINS`.
+Webové proměnné formuláře: `NEXT_PUBLIC_RECAPTCHA_SITE_KEY`, `RECAPTCHA_SECRET_KEY`, `RECAPTCHA_EXPECTED_HOSTNAME`, `RESEND_API_KEY`, `APP_ORIGIN`, `ALLOWED_ORIGINS`. Volitelně lze doplnit `INTEREST_BLOCKED_EMAIL_DOMAINS` (čárkami oddělené domény).
 
 Použijte samostatné, omezené service accounty podle možností projektu. Nedávejte JSON klíče do souborů v repozitáři. Vercel private key secret může obsahovat skutečné nové řádky; pokud se ukládá escapovaný zápis, runtime převádí `\\n` na nový řádek.
 
@@ -42,13 +42,15 @@ Použijte samostatné, omezené service accounty podle možností projektu. Ned�
 
 ## Firestore
 
-Kolekce a dokumenty zůstávají kompatibilní: `users`, uživatelské subkolekce `devices`, `entitlement`, `usage`, a kořenové `threatIndicators`, `indicatorHistory`, `userReports`, `threatDisputes`, `threatWatches`, `purchases`, `rateLimits`. Firestore rules/indexes jsou uloženy v `firestore/`; nasazují se Firebase CLI z tohoto repozitáře:
+Kolekce a dokumenty zůstávají kompatibilní: `users`, uživatelské subkolekce `devices`, `entitlement`, `usage`, a kořenové `threatIndicators`, `indicatorHistory`, `userReports`, `threatDisputes`, `threatWatches`, `purchases`, `rateLimits`. Pro e-mailové ověřování zájmu přibývá `testingInterestVerifications` (server-only, SHA-256 token ID, e-mail, stav a expirace). Firestore rules/indexes jsou uloženy v `firestore/`; nasazují se Firebase CLI z tohoto repozitáře:
 
 ```sh
 npm ci
 npm run test:rules
 firebase deploy --only firestore:rules,firestore:indexes
 ```
+
+Ve Firestore Indexes se nasadí TTL pro `testingInterestVerifications.expiresAt` (existující `rateLimits.expiresAt` zůstává beze změny). Pokud je potřeba, zkontrolujte vytvoření TTL politiky v Google Cloud Console → Firestore → Time-to-live. Ověřovací odkaz funguje 24 hodin a následně potvrzený záznam expiruje po 7 dnech. Firestore fyzicky maže expirované záznamy asynchronně.
 
 Rules neudělují klientovi oprávnění k autoritativním datům. Quota, entitlement, purchase binding, hrozby a rate limits zapisuje Admin SDK.
 
