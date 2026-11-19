@@ -9,7 +9,9 @@ import { deleteAccountAfterRateLimit } from "./accountDeletionRoute.js";
 import { handleAnalyzeHttp } from "./analyzeHttp.js";
 import * as billing from "./billing.js";
 import { requireSecret, optionalSecret } from "./config.js";
-import { firestore as getFirestore, firebaseAuth } from "./firebaseAdmin";
+import { firestore as getFirestore, firebaseAuth, firebaseAppCheck } from "./firebaseAdmin";
+import { handleAuthHttp } from "./authHttp.js";
+import { getCurrentPeriod } from "./analysisService.js";
 import { enforceRateLimit } from "./rateLimit.js";
 import * as threatIntel from "./threatIntel.js";
 import { fs } from "./fsHelpers.js";
@@ -46,11 +48,51 @@ function providers() {
 
 
 async function routeOperation(request: Request, segments: string[]) {
+  const path = segments.join("/");
+  if (path.startsWith("auth/")) {
+    return handleAuthHttp(request, path, {
+      db: getFirestore(),
+      auth: firebaseAuth(),
+      appCheck: firebaseAppCheck(),
+      verifyGoogleToken: async (idToken: string) => {
+        const audience = requireSecret("GOOGLE_OAUTH_WEB_CLIENT_ID");
+        const verified = await new OAuth2Client().verifyIdToken({ idToken, audience });
+        return verified.getPayload();
+      },
+    });
+  }
   const identity = await requireIdentity(request);
   const uid = identity.uid;
   const firestore = getFirestore();
   const method = request.method.toUpperCase();
-  const path = segments.join("/");
+  if (path === "me" && method === "GET") {
+    const userSnap = await firestore.collection("users").doc(uid).get();
+    const entitlementSnap = await firestore.collection("users").doc(uid).collection("entitlement").doc("current").get();
+    const usageSnap = await firestore.collection("users").doc(uid).collection("usage").doc(getCurrentPeriod()).get();
+    const user = userSnap.data() || {};
+    const ent = entitlementSnap.data() || {};
+    const usage = usageSnap.data() || {};
+    return jsonResponse(200, {
+      ok: true,
+      user: {
+        uid,
+        isAnonymous: false,
+        email: typeof user.email === "string" ? user.email : identity.email || null,
+        displayName: typeof user.displayName === "string" ? user.displayName : null,
+        createdAtMillis: Number(user.createdAtMillis || 0),
+      },
+      entitlement: entitlementSnap.exists ? {
+        tier: ent.tier || "FREE", status: ent.status || "FREE",
+        productId: ent.productId || null, basePlanId: ent.basePlanId || null,
+        expiryTimeMillis: ent.expiryTimeMillis || null, autoRenewing: ent.autoRenewing === true,
+        verifiedAtMillis: ent.verifiedAtMillis || null,
+      } : null,
+      usage: usageSnap.exists ? {
+        deepAnalysisCount: Number(usage.deepAnalysisCount || 0),
+        monthlyLimit: Number(usage.monthlyLimit || 0),
+      } : { deepAnalysisCount: 0, monthlyLimit: 0 },
+    });
+  }
 
   if (path === "analyze" && method === "POST") {
     return handleAnalyzeHttp({ request, identity, db: firestore, generate: generateOpenAi, providers: providers() });
