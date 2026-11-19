@@ -11,7 +11,6 @@ import * as billing from "./billing.js";
 import { requireSecret, optionalSecret } from "./config.js";
 import { firestore as getFirestore, firebaseAuth } from "./firebaseAdmin";
 import { enforceRateLimit } from "./rateLimit.js";
-import { enforceBetaAccess, enforceApiIpRateLimit } from "./apiAccessGuard.js";
 import { enforceApiIpRateLimit, enforceBetaAccess } from "./apiAbuseProtection.js";
 import * as threatIntel from "./threatIntel.js";
 import { fs } from "./fsHelpers.js";
@@ -49,12 +48,8 @@ function providers() {
 
 async function routeOperation(request: Request, segments: string[]) {
   const identity = await requireIdentity(request);
-  // Reject unapproved Firebase users during the closed beta, before any paid work.
-  enforceBetaAccess(identity);
   const uid = identity.uid;
   const firestore = getFirestore();
-  // Complement existing UID quotas with a shared per-IP limit.
-  await enforceApiIpRateLimit(firestore, request);
   const method = request.method.toUpperCase();
   const path = segments.join("/");
 
