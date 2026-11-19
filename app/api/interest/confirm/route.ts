@@ -85,6 +85,7 @@ export async function POST(request: NextRequest) {
     const db = firestore();
     const claim = await claimVerification(db, token);
     if (claim.state !== "send") return statePage(claim.state);
+    if (!claim.email || !claim.id || typeof claim.claim !== "number") return statePage("invalid");
     try {
       await sendVerifiedInterestNotification(claim.email, claim.id);
     } catch {
