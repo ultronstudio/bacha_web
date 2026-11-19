@@ -34,12 +34,19 @@ Nastavte stejné proměnné v lokálním prostředí i v projektu Vercel:
 | `RESEND_API_KEY` | Serverový API klíč Resend. |
 | `APP_ORIGIN` | Hlavní povolený origin, produkčně `https://bacha.petrvurm.cz`. |
 | `ALLOWED_ORIGINS` | Volitelné další přesně povolené originy oddělené čárkou, například Vercel preview URL. |
+| `INTEREST_BLOCKED_EMAIL_DOMAINS` | Volitelný čárkami oddělený doplněk blokovaných dočasných e-mailových domén. Vestavěný seznam už obsahuje `anonmart.com`. |
 
 Pro každý preview deployment přidejte jeho přesný `https://...vercel.app` origin do `ALLOWED_ORIGINS` a hostname daného preview nastavte také v reCAPTCHA konzoli, případně použijte zvláštní preview site key/secret a odpovídající `RECAPTCHA_EXPECTED_HOSTNAME` v Preview env scope Vercelu. Nepovolujte wildcard origin.
 
-## Rate limit
+## Ověřování zájmu o uzavřené testování
 
-API omezuje odesílání na 5 požadavků za 15 minut na IP. Ukládá HMAC-SHA-256 hash adresy, nikoli otevřenou IP. Současný jednoduchý limiter drží okna v paměti instance, takže je vhodný pro základní ochranu, ale není sdílený mezi serverless instancemi a po jejich restartu se vynuluje. Pro trvalý limit napříč instancemi připojte Redis/KV provider (například Upstash) a nahraďte `requestsByIpHash` atomickou operací v úložišti; potřebné KV proměnné zatím nejsou vyžadované.
+Formulář `POST /api/interest` nejprve ověřuje origin, honeypot, formát e-mailu, blokované dočasné domény a reCAPTCHA. Poté uloží do Firestore `testingInterestVerifications` pouze SHA-256 hash náhodného 32bytového ověřovacího tokenu, adresu a expiraci. **Oznámení provozovateli se neposílá, dokud zájemce adresu nepotvrdí.** Resend nejprve odešle potvrzovací e-mail. Odkaz je platný 24 hodin. GET `/api/interest/confirm?token=...` jej pouze zobrazí; až kliknutí na potvrzovací tlačítko (POST) transakčně rezervuje a pošle upozornění na `kontakt@petrvurm.cz`.
+
+Jedna přihláška může provozovateli vytvořit nejvýše jedno oznámení v běžném průchodu; souběžné požadavky chrání Firestore transakce, retry po chybě zajišťuje Resend `Idempotency-Key`. Při dočasném selhání Resendu lze potvrzení opakovat. Záznam po potvrzení zůstává nejvýše 7 dní do vypršení TTL (fyzické smazání je asynchronní). V `firestore/firestore.indexes.json` je pro `testingInterestVerifications.expiresAt` deklarované TTL; **před nasazením znovu deployujte Firestore indexes**.
+
+Proti zneužití odesílání běží distribuované Firestore limity: 5 žádostí / 15 minut / IP a 3 žádosti / 24 hodin / e-mail, s HMAC identifikátory v existující kolekci `rateLimits`, jejíž `expiresAt` už má TTL. Domény se ověřují na serveru; vestavěný blokovací seznam je záměrně konzervativní, nikoli úplný a lze jej doplnit `INTEREST_BLOCKED_EMAIL_DOMAINS`. Potvrzení adresy **neprokazuje**, že je použita jako Google účet; přidání do interního Google Play testování zůstává ruční.
+
+Testy: `npm test` zahrnují `test/unit/interestVerification.test.js` (blokované domény, tokeny, omezení, expirace, souběžné stavy a retry). Integraci s Resendem, reálným Firestore a reCAPTCHA je nutné ověřit přes preview nasazení bez skutečných uživatelů.
 
 ## Nasazení
 

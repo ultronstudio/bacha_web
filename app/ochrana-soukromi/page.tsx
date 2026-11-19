@@ -41,8 +41,9 @@ export default function PrivacyPage() {
           <h2>Formulář pro uzavřené testování</h2>
           <p>
             Pokud odešlete zájem o uzavřené testování, zpracujeme e-mailovou
-            adresu, kterou sami zadáte. Tato adresa slouží pouze k tomu, abychom
-            vás mohli kontaktovat ohledně testování aplikace Bacha!.
+            adresu, kterou sami zadáte. Nejprve na ni pošleme potvrzovací odkaz.
+            Teprve po potvrzení dostane provozovatel zprávu o zájmu.
+            Potvrzení adresy samo o sobě neznamená registraci Google účtu ani přidání do testovacího programu.
           </p>
           <div className="info-box">
             <strong>Účel formuláře:</strong> evidence zájmu o uzavřené testování
@@ -53,16 +54,20 @@ export default function PrivacyPage() {
             Formulář používá Google reCAPTCHA. Při jejím použití může Google
             zpracovat technické údaje potřebné k rozpoznání automatizovaného
             nebo zneužívajícího provozu. Server formuláře také používá limit
-            požadavků podle IP adresy. Pro rate limit se ukládá pouze HMAC hash
-            IP adresy, nikoli IP adresa v otevřeném tvaru. Na Vercelu je
-            aktuálně limit sdílený jen v rámci jedné instance; pro trvalou
-            ochranu napříč instancemi je potřeba externí KV úložiště.
+            požadavků podle IP adresy a e-mailové adresy. Pro rate limit se ukládají
+            pouze HMAC hashe identifikátorů, nikoli IP adresa v otevřeném tvaru.
+            Limity jsou sdílené přes Firestore napříč instancemi.
+            Známé jednorázové e-mailové domény jsou odmítány.
           </p>
           <h2>Odesílání e-mailů</h2>
           <p>
-            Notifikaci o zájmu o testování odesílá služba Resend. Zadaný e-mail
-            je součástí této notifikace a je doručen na kontaktní adresu
-            provozovatele.
+            Služba Resend nejprve doručí potvrzovací odkaz na zadanou adresu.
+            Po potvrzení odešle e-mail provozovateli.
+            Ověřovací odkaz platí 24 hodin; ověřovací záznam včetně adresy
+            může být uchován nejvýše sedm dní po potvrzení a je určen
+            k automatickému odstranění zásadou Firestore TTL. K fyzickému
+            odstranění může dojít s určitým zpožděním. Token ukládáme pouze
+            v podobě hashe.
           </p>
           <h2>Aplikace Bacha!</h2>
           <p>
