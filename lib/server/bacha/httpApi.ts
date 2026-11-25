@@ -11,6 +11,7 @@ import * as billing from "./billing.js";
 import { requireSecret, optionalSecret } from "./config.js";
 import { firestore as getFirestore, firebaseAuth } from "./firebaseAdmin";
 import { enforceRateLimit } from "./rateLimit.js";
+import { enforceApiIpRateLimit, enforceBetaAccess } from "./apiAbuseProtection.js";
 import * as threatIntel from "./threatIntel.js";
 import { fs } from "./fsHelpers.js";
 import { validateDeviceId, validateDevicePayload } from "./deviceValidation.js";
@@ -51,6 +52,12 @@ async function routeOperation(request: Request, segments: string[]) {
   const firestore = getFirestore();
   const method = request.method.toUpperCase();
   const path = segments.join("/");
+
+  // Only valid Firebase Auth + App Check identities can reach this point.
+  // Closed-beta access and IP quotas are additional defenses: neither can
+  // prevent a direct Firebase Authentication SDK account creation.
+  enforceBetaAccess(uid, method, path);
+  await enforceApiIpRateLimit(firestore, request, method, path);
 
   if (path === "analyze" && method === "POST") {
     return handleAnalyzeHttp({ request, identity, db: firestore, generate: generateOpenAi, providers: providers() });
