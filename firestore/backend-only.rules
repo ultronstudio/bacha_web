@@ -1,0 +1,17 @@
+rules_version = '2';
+
+// FINAL POST-MIGRATION POLICY – deploy ONLY after all Android clients have
+// switched from FirebaseAuth/Firestore SDK to bacha_web.
+//
+// All application data is exposed exclusively by the Bacha server API using
+// verified Google identity + App Check + server-owned rotating sessions.
+// The Firebase Admin SDK bypasses security rules.
+// No direct client reads, not even "own" documents, because old FirebaseAuth
+// tokens can outlive rollout until explicitly revoked.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

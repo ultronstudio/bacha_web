@@ -8,10 +8,12 @@ import { deleteAllUserData } from "./accountDeletion.js";
 import { deleteAccountAfterRateLimit } from "./accountDeletionRoute.js";
 import { handleAnalyzeHttp } from "./analyzeHttp.js";
 import * as billing from "./billing.js";
-import { requireSecret, optionalSecret } from "./config.js";
-import { firestore as getFirestore, firebaseAuth } from "./firebaseAdmin";
+import { requireSecret, optionalSecret, FREE_MONTHLY_LIMIT, PLUS_MONTHLY_LIMIT } from "./config.js";
+import { firestore as getFirestore, firebaseAuth, firebaseAppCheck } from "./firebaseAdmin";
+import { handleAuthHttp } from "./authHttp.js";
+import { getCurrentPeriod } from "./analysisService.js";
 import { enforceRateLimit } from "./rateLimit.js";
-import { enforceApiIpRateLimit, enforceBetaAccess } from "./apiAbuseProtection.js";
+import { enforceBetaAccess, enforceApiIpRateLimit } from "./apiAbuseProtection.js";
 import * as threatIntel from "./threatIntel.js";
 import { fs } from "./fsHelpers.js";
 import { validateDeviceId, validateDevicePayload } from "./deviceValidation.js";
@@ -47,17 +49,54 @@ function providers() {
 
 
 async function routeOperation(request: Request, segments: string[]) {
+  const path = segments.join("/");
+  if (path.startsWith("auth/")) {
+    return handleAuthHttp(request, path, {
+      db: getFirestore(),
+      auth: firebaseAuth(),
+      appCheck: firebaseAppCheck(),
+      verifyGoogleToken: async (idToken: string) => {
+        const audience = requireSecret("GOOGLE_OAUTH_WEB_CLIENT_ID");
+        const verified = await new OAuth2Client().verifyIdToken({ idToken, audience });
+        return verified.getPayload();
+      },
+    });
+  }
   const identity = await requireIdentity(request);
   const uid = identity.uid;
   const firestore = getFirestore();
   const method = request.method.toUpperCase();
-  const path = segments.join("/");
-
-  // Only valid Firebase Auth + App Check identities can reach this point.
-  // Closed-beta access and IP quotas are additional defenses: neither can
-  // prevent a direct Firebase Authentication SDK account creation.
+  // Separate from Firebase Auth sign-up limits; these quotas protect Vercel API.
   enforceBetaAccess(uid, method, path);
   await enforceApiIpRateLimit(firestore, request, method, path);
+  if (path === "me" && method === "GET") {
+    const userSnap = await firestore.collection("users").doc(uid).get();
+    const entitlementSnap = await firestore.collection("users").doc(uid).collection("entitlement").doc("current").get();
+    const usageSnap = await firestore.collection("users").doc(uid).collection("usage").doc(getCurrentPeriod()).get();
+    const user = userSnap.data() || {};
+    const ent = entitlementSnap.data() || {};
+    const usage = usageSnap.data() || {};
+    return jsonResponse(200, {
+      ok: true,
+      user: {
+        uid,
+        isAnonymous: false,
+        email: typeof user.email === "string" ? user.email : identity.email || null,
+        displayName: typeof user.displayName === "string" ? user.displayName : null,
+        createdAtMillis: Number(user.createdAtMillis || 0),
+      },
+      entitlement: entitlementSnap.exists ? {
+        tier: ent.tier || "FREE", status: ent.status || "FREE",
+        productId: ent.productId || null, basePlanId: ent.basePlanId || null,
+        expiryTimeMillis: ent.expiryTimeMillis || null, autoRenewing: ent.autoRenewing === true,
+        verifiedAtMillis: ent.verifiedAtMillis || null,
+      } : { tier: "FREE", status: "FREE" },
+      usage: usageSnap.exists ? {
+        deepAnalysisCount: Number(usage.deepAnalysisCount || 0),
+        monthlyLimit: billing.entitlementGrantsPlus(ent, Date.now()) ? PLUS_MONTHLY_LIMIT : FREE_MONTHLY_LIMIT,
+      } : { deepAnalysisCount: 0, monthlyLimit: billing.entitlementGrantsPlus(ent, Date.now()) ? PLUS_MONTHLY_LIMIT : FREE_MONTHLY_LIMIT },
+    });
+  }
 
   if (path === "analyze" && method === "POST") {
     return handleAnalyzeHttp({ request, identity, db: firestore, generate: generateOpenAi, providers: providers() });
