@@ -59,6 +59,17 @@ export default function PrivacyPage() {
             Limity jsou sdílené přes Firestore napříč instancemi.
             Známé jednorázové e-mailové domény jsou odmítány.
           </p>
+          <h2>Ochrana cloudového API</h2>
+          <p>
+            Cloudové API aplikace Bacha! vyžaduje ověřené přihlášení Firebase
+            a ověřovací token App Check. Abychom omezili automatizované
+            požadavky a zneužití služby, vedle limitů podle uživatelského UID
+            uplatňujeme limity také podle zdrojové IP adresy. Pro jejich
+            vyhodnocování uchováváme ve Firestore pouze HMAC otisk IP adresy,
+            druh operace, počet požadavků a datum vypršení limitu;
+            původní IP adresu do těchto záznamů neukládáme. Záznamy
+            automaticky expirují podle nastavení Firestore TTL.
+          </p>
           <h2>Odesílání e-mailů</h2>
           <p>
             Služba Resend nejprve doručí potvrzovací odkaz na zadanou adresu.
