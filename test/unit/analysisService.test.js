@@ -139,3 +139,13 @@ test("pickup message with falsely elevated cloud signal stays inconclusive", asy
   assert.equal(r.signals.length,0);
   assert.equal(r.quotaCharged,true);
 });
+
+test("known-malicious advice matches the indicator type (Phase 4)", () => {
+  const phone = svc.knownMaliciousActions({ indicatorType: "PHONE" });
+  assert.ok(phone.every((a) => !/odkaz/i.test(a.title + a.description)), "no link advice for a phone number");
+  assert.match(phone[0].title, /číslo/);
+  const url = svc.knownMaliciousActions({ indicatorType: "URL" });
+  assert.match(url[0].title, /Odkaz/);
+  const unknown = svc.knownMaliciousActions(null);
+  assert.ok(unknown.every((a) => !/odkaz/i.test(a.title + a.description)));
+});
