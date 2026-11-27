@@ -7,6 +7,8 @@ import type { Firestore } from "firebase-admin/firestore";
 import { deleteAllUserData } from "./accountDeletion.js";
 import { deleteAccountAfterRateLimit } from "./accountDeletionRoute.js";
 import { handleAnalyzeHttp } from "./analyzeHttp.js";
+import { defaultResolve } from "./domainFacts.js";
+import { sweepAbandoned } from "./analysisLedger.js";
 import * as billing from "./billing.js";
 import { requireSecret, optionalSecret, FREE_MONTHLY_LIMIT, PLUS_MONTHLY_LIMIT } from "./config.js";
 import { firestore as getFirestore, firebaseAuth, firebaseAppCheck } from "./firebaseAdmin";
@@ -99,7 +101,7 @@ async function routeOperation(request: Request, segments: string[]) {
   }
 
   if (path === "analyze" && method === "POST") {
-    return handleAnalyzeHttp({ request, identity, db: firestore, generate: generateOpenAi, providers: providers() });
+    return handleAnalyzeHttp({ request, identity, db: firestore, generate: generateOpenAi, providers: providers(), resolveDomain: defaultResolve });
   }
   if (path === "threats/lookup" && method === "POST") {
     await enforceRateLimit(firestore, uid, "lookupThreatIndicators");
@@ -240,7 +242,9 @@ export async function handleCron(request: Request) {
     }
     const firestore = getFirestore();
     const result = await threatIntel.revalidateExpiredIndicators(firestore);
-    return jsonResponse(200, { ok: true, ...result });
+    // Refund credits reserved by invocations that crashed before completing (BUG-11).
+    const ledgerResult = await sweepAbandoned(firestore, Date.now());
+    return jsonResponse(200, { ok: true, ...result, ...ledgerResult });
   } catch (error) {
     return errorResponse(error, "Revalidaci hrozeb se nepodařilo dokončit.");
   }

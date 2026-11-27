@@ -66,6 +66,8 @@ service cloud.firestore {
     match /threatDisputes/{disputeId} { allow read, write: if false; }
     match /purchases/{tokenHash} { allow read, write: if false; }
     match /rateLimits/{limitId} { allow read, write: if false; }
+    // Deep-analysis credit ledger: server (Admin SDK) only.
+    match /analysisRequests/{recordId} { allow read, write: if false; }
 
     match /{document=**} {
       allow read, write: if false;
