@@ -9,6 +9,7 @@ import { deleteAccountAfterRateLimit } from "./accountDeletionRoute.js";
 import { handleAnalyzeHttp } from "./analyzeHttp.js";
 import { defaultResolve } from "./domainFacts.js";
 import { sweepAbandoned } from "./analysisLedger.js";
+import { purgeExpired } from "./expiryCleanup.js";
 import * as billing from "./billing.js";
 import { requireSecret, optionalSecret, FREE_MONTHLY_LIMIT, PLUS_MONTHLY_LIMIT } from "./config.js";
 import { firestore as getFirestore, firebaseAuth, firebaseAppCheck } from "./firebaseAdmin";
@@ -244,7 +245,9 @@ export async function handleCron(request: Request) {
     const result = await threatIntel.revalidateExpiredIndicators(firestore);
     // Refund credits reserved by invocations that crashed before completing (BUG-11).
     const ledgerResult = await sweepAbandoned(firestore, Date.now());
-    return jsonResponse(200, { ok: true, ...result, ...ledgerResult });
+    // Spark-plan replacement for Firestore TTL policies: delete expired documents (bounded).
+    const cleanup = await purgeExpired(firestore, Date.now());
+    return jsonResponse(200, { ok: true, ...result, ...ledgerResult, ...cleanup });
   } catch (error) {
     return errorResponse(error, "Revalidaci hrozeb se nepodařilo dokončit.");
   }

@@ -33,26 +33,22 @@
     {
       "collectionGroup": "rateLimits",
       "fieldPath": "expiresAt",
-      "ttl": true,
-      "indexes": []
+      "ttl": true
     },
     {
       "collectionGroup": "testingInterestVerifications",
       "fieldPath": "expiresAt",
-      "ttl": true,
-      "indexes": []
+      "ttl": true
     },
     {
       "collectionGroup": "authSessions",
       "fieldPath": "expiresAt",
-      "ttl": true,
-      "indexes": []
+      "ttl": true
     },
     {
       "collectionGroup": "analysisRequests",
       "fieldPath": "expiresAt",
-      "ttl": true,
-      "indexes": []
+      "ttl": true
     }
   ]
 }
