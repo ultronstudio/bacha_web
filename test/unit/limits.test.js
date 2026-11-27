@@ -54,3 +54,12 @@ describe("other limits", () => {
     assert.equal(L.validateDisputeRequest({ lookupKey: key, reason: "long enough reason" }).lookupKey, key);
   });
 });
+
+test("analyze requestId is optional and strictly validated (Phase 4)", () => {
+  const L = require("../../lib/server/bacha/limits");
+  assert.equal(L.validateAnalyzeRequest({ text: "x" }).requestId, null);
+  assert.equal(L.validateAnalyzeRequest({ text: "x", requestId: "0f8fad5b-d9cb-469f-a165-70867728950e" }).requestId, "0f8fad5b-d9cb-469f-a165-70867728950e");
+  for (const bad of ["short", "x".repeat(65), "bad id with spaces!!", 42]) {
+    assert.throws(() => L.validateAnalyzeRequest({ text: "x", requestId: bad }));
+  }
+});
