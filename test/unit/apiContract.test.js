@@ -20,7 +20,24 @@ test("versioned HTTP contract exposes every migrated operation", () => {
 test("sensitive route responses set no-store and REST errors are consistent", () => {
   const source = fs.readFileSync(path.join(__dirname, "../../lib/server/bacha/authCore.js"), "utf8");
   assert.match(source, /Cache-Control.*no-store/);
-  assert.match(source, /ok: false, error: \{ code, message \}/);
+  // Behavioural contract (was a source regex): every error body has ok=false and
+  // error.code + error.message; Phase 5 only ADDS optional reason / retryAfterSeconds.
+  assert.match(source, /ok: false, error: \{ code, message/);
+});
+
+test("error reasons and Retry-After are optional, machine-readable extensions (Phase 5)", async () => {
+  const { RateLimitError } = require("../../lib/server/bacha/rateLimit");
+  const r = errorResponse(new RateLimitError("analyzeContent", { scope: "user", retryAfterSeconds: 42 }));
+  assert.equal(r.status, 429);
+  assert.equal(r.headers.get("retry-after"), "42");
+  const b = await r.json();
+  assert.deepEqual([b.error.code, b.error.reason, b.error.retryAfterSeconds], ["resource-exhausted", "user_rate_limited", 42]);
+  assert.equal(typeof b.error.message, "string");
+  const ip = await errorResponse(new RateLimitError("analyze", { scope: "ip", retryAfterSeconds: 5 })).json();
+  assert.equal(ip.error.reason, "ip_rate_limited");
+  const plain = errorResponse(Object.assign(new Error("x"), { code: "unauthenticated" }));
+  assert.equal(plain.headers.get("retry-after"), null);
+  assert.deepEqual(Object.keys((await plain.json()).error), ["code", "message"]);
 });
 
 test("maps legacy backend error codes to the REST status contract", async () => {
