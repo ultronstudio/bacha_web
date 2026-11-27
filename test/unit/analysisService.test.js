@@ -146,6 +146,8 @@ test("known-malicious advice matches the indicator type (Phase 4)", () => {
   assert.match(phone[0].title, /číslo/);
   const url = svc.knownMaliciousActions({ indicatorType: "URL" });
   assert.match(url[0].title, /Odkaz/);
+  assert.doesNotMatch(svc.knownMaliciousSummaryAdvice({ indicatorType: "PHONE" }), /klik/i);
+  assert.match(svc.knownMaliciousSummaryAdvice({ indicatorType: "URL" }), /Neklikejte/);
   const unknown = svc.knownMaliciousActions(null);
   assert.ok(unknown.every((a) => !/odkaz/i.test(a.title + a.description)));
 });
