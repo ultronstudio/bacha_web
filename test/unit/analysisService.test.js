@@ -139,3 +139,72 @@ test("pickup message with falsely elevated cloud signal stays inconclusive", asy
   assert.equal(r.signals.length,0);
   assert.equal(r.quotaCharged,true);
 });
+
+test("known-malicious advice matches the indicator type (Phase 4)", () => {
+  const phone = svc.knownMaliciousActions({ indicatorType: "PHONE" });
+  assert.ok(phone.every((a) => !/odkaz/i.test(a.title + a.description)), "no link advice for a phone number");
+  assert.match(phone[0].title, /číslo/);
+  const url = svc.knownMaliciousActions({ indicatorType: "URL" });
+  assert.match(url[0].title, /Odkaz/);
+  assert.doesNotMatch(svc.knownMaliciousSummaryAdvice({ indicatorType: "PHONE" }), /klik/i);
+  assert.match(svc.knownMaliciousSummaryAdvice({ indicatorType: "URL" }), /Neklikejte/);
+  const unknown = svc.knownMaliciousActions(null);
+  assert.ok(unknown.every((a) => !/odkaz/i.test(a.title + a.description)));
+});
+
+describe("idempotent deep analysis (Phase 4)", () => {
+  const withId = (text, requestId) => ({ ...input(text), requestId });
+
+  test("retried request with the same requestId is charged once and returns the same result", async () => {
+    const db = freshDb(() => NOW);
+    let calls = 0;
+    const gen = async () => { calls++; return goodAi; };
+    const first = await svc.analyzeContent(deps(db, gen), "u1", withId("Zaplaťte do hodiny", "req-0123456789abcdef"));
+    const again = await svc.analyzeContent(deps(db, gen), "u1", withId("Zaplaťte do hodiny", "req-0123456789abcdef"));
+    assert.equal(first.quotaCharged, true);
+    assert.equal(again.quotaCharged, false);
+    assert.equal(again.duplicateRequest, true);
+    assert.equal(again.resultCategory, first.resultCategory);
+    assert.equal(calls, 1, "provider not called twice");
+    assert.equal(usage(db, "u1"), 1);
+  });
+
+  test("concurrent duplicates: exactly one charge, the other is rejected as already-exists", async () => {
+    const db = freshDb(() => NOW);
+    let release;
+    const gate = new Promise((r) => { release = r; });
+    const gen = async () => { await gate; return goodAi; };
+    const p1 = svc.analyzeContent(deps(db, gen, { aiTimeoutMs: 5000 }), "u1", withId("x y z", "req-concurrent-000001"));
+    await new Promise((r) => setTimeout(r, 10));
+    await assert.rejects(svc.analyzeContent(deps(db, gen), "u1", withId("x y z", "req-concurrent-000001")), (e) => e.code === "already-exists");
+    release();
+    await p1;
+    assert.equal(usage(db, "u1"), 1);
+  });
+
+  test("failed request is rolled back and may be retried with the same id", async () => {
+    const db = freshDb(() => NOW);
+    await assert.rejects(svc.analyzeContent(deps(db, async () => "<html>"), "u1", withId("x", "req-retry-after-fail-01")), svc.AnalysisUnavailableError);
+    assert.equal(usage(db, "u1"), 0);
+    const ok = await svc.analyzeContent(deps(db, async () => goodAi), "u1", withId("x", "req-retry-after-fail-01"));
+    assert.equal(ok.quotaCharged, true);
+    assert.equal(usage(db, "u1"), 1);
+  });
+
+  test("different requestIds are separate analyses; requests without id keep the old behaviour", async () => {
+    const db = freshDb(() => NOW);
+    await svc.analyzeContent(deps(db, async () => goodAi), "u1", withId("x", "req-aaaaaaaaaaaaaaaa"));
+    await svc.analyzeContent(deps(db, async () => goodAi), "u1", withId("x", "req-bbbbbbbbbbbbbbbb"));
+    await svc.analyzeContent(deps(db, async () => goodAi), "u1", input("x"));
+    await svc.analyzeContent(deps(db, async () => goodAi), "u1", input("x"));
+    assert.equal(usage(db, "u1"), 4);
+  });
+
+  test("truncated (incomplete) provider output is never parsed and never charged", async () => {
+    const { extractOpenAiText } = require("../../lib/server/bacha/openaiClient");
+    assert.throws(() => extractOpenAiText({ status: "incomplete", incomplete_details: { reason: "max_output_tokens" }, output: [] }), /Incomplete/);
+    const db = freshDb(() => NOW);
+    await assert.rejects(svc.analyzeContent(deps(db, async () => goodAi.slice(0, 40)), "u1", input("x")), svc.AnalysisUnavailableError);
+    assert.equal(usage(db, "u1"), 0);
+  });
+});

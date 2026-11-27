@@ -180,17 +180,22 @@ class DocSnap {
 }
 
 class Query {
-  constructor(db, path, filters = [], limitN = null) {
+  constructor(db, path, filters = [], limitN = null, afterPath = null) {
     this.db = db;
     this.path = path;
     this.filters = filters;
     this.limitN = limitN;
+    this.afterPath = afterPath;
   }
   where(field, op, value) {
-    return new Query(this.db, this.path, [...this.filters, { field, op, value }], this.limitN);
+    return new Query(this.db, this.path, [...this.filters, { field, op, value }], this.limitN, this.afterPath);
   }
   limit(n) {
-    return new Query(this.db, this.path, this.filters, n);
+    return new Query(this.db, this.path, this.filters, n, this.afterPath);
+  }
+  /** Cursor after a document snapshot (document-path order). */
+  startAfter(snap) {
+    return new Query(this.db, this.path, this.filters, this.limitN, snap.ref.path);
   }
   async get() {
     this.db._check("read", this.path);
@@ -211,6 +216,9 @@ class Query {
         }
       });
     });
+    if (this.db.queryHook) this.db.queryHook(this);
+    paths.sort();
+    if (this.afterPath != null) paths = paths.filter((p) => p > this.afterPath);
     if (this.limitN != null) paths = paths.slice(0, this.limitN);
     const docs = paths.map((p) => new DocSnap(new DocRef(this.db, p), this.db.store.get(p)));
     return { docs, size: docs.length, empty: docs.length === 0, forEach: (f) => docs.forEach(f) };
