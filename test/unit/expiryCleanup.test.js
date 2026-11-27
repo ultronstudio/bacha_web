@@ -48,3 +48,39 @@ test("a failing collection does not stop the others", async () => {
   assert.equal(r.expiryCleanup.collections.analysisRequests.error, "failed-precondition");
   assert.equal(r.expiryCleanup.collections.authSessions.deleted, 1);
 });
+
+test("preserves records refreshed after the expiry query and pending reservations", async () => {
+  const db = freshDb();
+  const session = db.collection("authSessions").doc("refresh");
+  const ledger = db.collection("analysisRequests").doc("reserve");
+  await session.set({ expiresAt: ts(NOW - 1000) });
+  await ledger.set({ status: "done", expiresAt: ts(NOW - 1000) });
+  const original = db.runTransaction.bind(db);
+  let first = true;
+  db.runTransaction = async (fn) => {
+    if (first) {
+      first = false;
+      await session.set({ expiresAt: ts(NOW + 1000) });
+      await ledger.set({ status: "pending", expiresAt: ts(NOW - 1000) });
+    }
+    return original(fn);
+  };
+  const r = await purgeExpired(db, NOW, { logger: silentLogger });
+  assert.equal(r.expiryCleanup.total, 0);
+  assert.ok(db.raw("authSessions/refresh"));
+  assert.equal(db.raw("analysisRequests/reserve").status, "pending");
+});
+
+test("rechecks a session renewed between its query and transaction", async () => {
+  const db = freshDb();
+  const session = db.collection("authSessions").doc("refresh");
+  await session.set({ expiresAt: ts(NOW - 1000) });
+  const original = db.runTransaction.bind(db);
+  db.runTransaction = async (fn) => {
+    await session.set({ expiresAt: ts(NOW + 1000) });
+    return original(fn);
+  };
+  const r = await purgeExpired(db, NOW, { logger: silentLogger });
+  assert.equal(r.expiryCleanup.total, 0);
+  assert.ok(db.raw("authSessions/refresh"));
+});
