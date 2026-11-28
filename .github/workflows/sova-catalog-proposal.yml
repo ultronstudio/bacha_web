@@ -1,0 +1,68 @@
+# Review-only: proposes a candidate SOVA model catalog entry after bacha's sova-update.yml has
+# independently verified a release's dual signatures. Never merges, never promotes to "stable",
+# never writes directly to main - only opens (or idempotently no-ops on retry for) a PR a human
+# must review. See lib/server/bacha/modelCatalog.js for the trust model this intentionally does
+# NOT re-implement (no SOVA keys live in this repository).
+name: SOVA catalog entry proposal (review-only)
+on:
+  repository_dispatch:
+    types: [sova-catalog-proposal]
+permissions:
+  contents: read
+concurrency:
+  group: sova-catalog-proposal
+  cancel-in-progress: false
+jobs:
+  propose:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 22, cache: npm }
+      - run: npm ci
+      - name: Validate and stage the proposed entry
+        env:
+          PAYLOAD: ${{ toJson(github.event.client_payload) }}
+        run: node scripts/propose-sova-catalog-entry.mjs "$PAYLOAD"
+      - name: Open a review-only PR (idempotent retry)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GENERATION: ${{ github.event.client_payload.generation }}
+          VERSION: ${{ github.event.client_payload.version }}
+        run: |
+          BRANCH="sova-catalog/gen-$GENERATION"
+          EXISTING="$(gh pr list --head "$BRANCH" --state all --json url -q '.[0].url // empty')"
+          if [ -n "$EXISTING" ]; then
+            echo "Already proposed for generation $GENERATION: $EXISTING"
+            exit 0
+          fi
+          git switch -c "$BRANCH"
+          git add lib/server/bacha/sovaCatalogEntries.json
+          if git diff --cached --quiet; then
+            echo "No change staged (entry already present on main); nothing to propose."
+            exit 0
+          fi
+          git -c user.name=sova-catalog-bot -c user.email=sova-catalog-bot@users.noreply.github.com \
+            commit -m "Propose SOVA catalog entry: $VERSION (generation $GENERATION, owner-test)"
+          gh auth setup-git
+          git push origin "$BRANCH"
+          gh pr create --title "Propose SOVA catalog entry: $VERSION (owner-test, review-only)" --base main --body "$(cat <<EOF
+          Opened automatically after bacha's \`sova-update.yml\` independently verified this
+          release's author + CI-receipt signatures (not re-verified here - this repository has
+          no pinned SOVA keys). Always proposed on the \`owner-test\` channel, never \`stable\`.
+
+          **Before merging:**
+          - [ ] Cross-check this entry against the corresponding, already-merged or pending
+                \`ultronstudio/bacha\` lock-update PR for the same version.
+          - [ ] Confirm generation $GENERATION is the expected next value for this channel.
+          - [ ] Confirm the release asset is actually fetchable by the app (see the "free vs.
+                private distribution" note in \`lib/server/bacha/modelCatalog.js\`).
+
+          Never auto-merged. Merging this makes the entry resolvable by \`owner-test\`-channel
+          callers only (see \`sovaOwnerTestAuth.js\`); promoting to \`stable\` is a separate,
+          manual, independently reviewed change.
+          EOF
+          )"

@@ -107,8 +107,9 @@ async function routeOperation(request: Request, segments: string[]) {
   }
   if (path === "models/sova/latest" && method === "GET") {
     // Static, reviewed catalog (modelCatalog.js) - deliberately no Firestore read/write here;
-    // see docs/model-catalog-schema.md for the shared contract with the Android client.
-    return jsonResponse(200, await handleModelCatalogLatest(request));
+    // see docs/model-catalog-schema.md for the shared contract with the Android client. identity
+    // is only used for the separate owner-test channel authorization (sovaOwnerTestAuth.js).
+    return jsonResponse(200, await handleModelCatalogLatest(request, identity));
   }
   if (path === "threats/lookup" && method === "POST") {
     await enforceRateLimit(firestore, uid, "lookupThreatIndicators");

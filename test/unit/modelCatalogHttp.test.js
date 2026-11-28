@@ -35,6 +35,42 @@ describe("handleModelCatalogLatest (no Firestore access - metadata only)", () =>
   });
 });
 
+describe("owner-test channel authorization (separate from general admin access)", () => {
+  const prevAllowlist = process.env.BACHA_SOVA_OWNER_TEST_UIDS;
+  afterEach(() => {
+    if (prevAllowlist === undefined) delete process.env.BACHA_SOVA_OWNER_TEST_UIDS; else process.env.BACHA_SOVA_OWNER_TEST_UIDS = prevAllowlist;
+  });
+
+  test("stable channel never requires the owner-test allowlist", async () => {
+    delete process.env.BACHA_SOVA_OWNER_TEST_UIDS;
+    const body = await handleModelCatalogLatest(req("?channel=stable"), { uid: "random-user" });
+    assert.deepEqual(body, { ok: true, available: false, reason: "no_approved_version" });
+  });
+  test("owner-test channel rejects a caller not on the allowlist", async () => {
+    process.env.BACHA_SOVA_OWNER_TEST_UIDS = "owner-uid";
+    await assert.rejects(
+      () => handleModelCatalogLatest(req("?channel=owner-test"), { uid: "random-user" }),
+      (e) => e.status === 403,
+    );
+  });
+  test("owner-test channel rejects a missing identity", async () => {
+    process.env.BACHA_SOVA_OWNER_TEST_UIDS = "owner-uid";
+    await assert.rejects(() => handleModelCatalogLatest(req("?channel=owner-test"), undefined), (e) => e.status === 403);
+  });
+  test("owner-test channel allows an allowlisted caller through to normal (fail-closed) resolution", async () => {
+    process.env.BACHA_SOVA_OWNER_TEST_UIDS = "owner-uid";
+    const body = await handleModelCatalogLatest(req("?channel=owner-test"), { uid: "owner-uid" });
+    assert.deepEqual(body, { ok: true, available: false, reason: "no_approved_version" });
+  });
+  test("the general admin allowlist alone does not grant owner-test channel access", async () => {
+    process.env.BACHA_SOVA_OWNER_TEST_UIDS = "owner-uid"; // deliberately does NOT include "admin-uid"
+    await assert.rejects(
+      () => handleModelCatalogLatest(req("?channel=owner-test"), { uid: "admin-uid", admin: true }),
+      (e) => e.status === 403,
+    );
+  });
+});
+
 describe("dev fixture (never active in production, never the default)", () => {
   const prevEnv = process.env.NODE_ENV;
   const prevFixture = process.env.BACHA_MODEL_CATALOG_DEV_FIXTURE;
