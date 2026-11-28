@@ -10,7 +10,7 @@ test("versioned HTTP contract exposes every migrated operation", () => {
   for (const route of [
     'path === "analyze"', 'path === "threats/lookup"', 'path === "threats/report"',
     'path === "threats/dispute"', 'path === "threats/watch"', 'path === "threats/watches"',
-    'path === "billing/verify"', 'path === "account"', 'path === "admin/threats/moderate"',
+    'path === "billing/verify"', 'path === "models/sova/latest"', 'path === "account"', 'path === "admin/threats/moderate"',
     'path === "admin/disputes/resolve"', 'devices\\/',
   ]) assert.ok(source.includes(route), `missing API route ${route}`);
   assert.match(source, /handleRtdn/);

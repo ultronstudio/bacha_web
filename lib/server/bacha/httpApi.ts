@@ -17,6 +17,7 @@ import { handleAuthHttp } from "./authHttp.js";
 import { getCurrentPeriod } from "./analysisService.js";
 import { enforceRateLimit } from "./rateLimit.js";
 import { enforceBetaAccess, enforceApiIpRateLimit } from "./apiAbuseProtection.js";
+import { handleModelCatalogLatest } from "./modelCatalogHttp.js";
 import * as threatIntel from "./threatIntel.js";
 import { fs } from "./fsHelpers.js";
 import { validateDeviceId, validateDevicePayload } from "./deviceValidation.js";
@@ -103,6 +104,11 @@ async function routeOperation(request: Request, segments: string[]) {
 
   if (path === "analyze" && method === "POST") {
     return handleAnalyzeHttp({ request, identity, db: firestore, generate: generateOpenAi, providers: providers(), resolveDomain: defaultResolve });
+  }
+  if (path === "models/sova/latest" && method === "GET") {
+    // Static, reviewed catalog (modelCatalog.js) - deliberately no Firestore read/write here;
+    // see docs/model-catalog-schema.md for the shared contract with the Android client.
+    return jsonResponse(200, await handleModelCatalogLatest(request));
   }
   if (path === "threats/lookup" && method === "POST") {
     await enforceRateLimit(firestore, uid, "lookupThreatIndicators");
